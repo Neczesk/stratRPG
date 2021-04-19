@@ -1,5 +1,8 @@
-sys.path.append(".")
-from wrappedNoise import wrappedNoise
+
+
+#Local Imports
+import wrappednoise
+import db
 
 class MapTile:
 	"""This class represents a single space on the map through which entities can move or exist on."""
@@ -20,9 +23,9 @@ class MapTile:
 			self.tile_type = "mountain"
 		elif self.temperature <= 30:
 			if self.precipitation <= 30:
-				self.tile_type "tundra"
+				self.tile_type = "tundra"
 			if self.precipitation > 30 and self.precipitation <= 70:
-				self.tile_type "boreal"
+				self.tile_type = "boreal"
 			if self.precipitation > 70:
 				self.tile_type = "marsh"
 		elif self.temperature > 30:
@@ -41,13 +44,28 @@ class MapTile:
 				self.tile_type = "tropical_forest"
 
 
-def mapgen(width, height, noiseConfig):
-	noisy = OpenSimplex(int(time.time()))
+def generate_tile_list(width, height, noiseConfig):
+	noise = wrappednoise.WrappedNoise(noiseConfig)
+	print(noise.noise_at_point(10, 20))
 	tileList = []
 	x = 0
 	y = 0
 	for i in range(0,width*height):
+		
 		if x >= width:
 			x = 0
-			y++
-		tileList[i] = MapTile(x,y,0,0,0)
+			y+=1
+		el = noise.noise_at_point(x,y) + 1.0
+		el = el * 50
+		tileList.append(MapTile(x,y,el,0,0))
+		x += 1
+	return tileList
+
+if __name__ == "__main__":
+	config = wrappednoise.NoiseConfig(8, .008, 1)
+	map_tiles = generate_tile_list(40,20, config)
+	database = db.MapDB()
+	for i in range(len(map_tiles)):
+		database.add_tile(i, map_tiles[i].xCord, map_tiles[i].yCord, map_tiles[i].elevation,\
+			map_tiles[i].precipitation, map_tiles[i].temperature, map_tiles[i].tile_type)
+	database.save_to_file("test.world.db")
