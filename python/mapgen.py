@@ -1,3 +1,6 @@
+sys.path.append(".")
+from wrappedNoise import wrappedNoise
+
 class MapTile:
 	"""This class represents a single space on the map through which entities can move or exist on."""
 	xCord: int

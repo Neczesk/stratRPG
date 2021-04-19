@@ -25,5 +25,7 @@ if __name__ == "__main__":
 	n = noiseConfig(8, .0008, 1)
 	w = wrappedNoise(n)
 
-	print(w.conf.octaves)
-	print(w.noise.noise2d(x=3,y=7))
+	if w.conf.octaves != 8:
+		print(w.conf.octaves)
+	"""print(w.noise.noise2d(x=3,y=7))
+	
