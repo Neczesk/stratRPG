@@ -24,6 +24,10 @@ class WrappedNoise:
 	noise: OpenSimplex
 
 	def noise_at_point(self,x,y):
+		x= x +1
+		y = y + 1
+		if x == 0 and y == 0:
+			print(self.noise.noise2d(x,y))
 		output = 0.0
 		divisor = 0.0
 		octfac = 1.0
@@ -35,6 +39,9 @@ class WrappedNoise:
 		output = output / divisor
 		output = pow(output, self.conf.exp)
 		return output
+
+def noise_to_percent(input: float):
+	return (((input + 1) * 100)/ 2)
 
 
 

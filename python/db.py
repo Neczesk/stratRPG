@@ -26,6 +26,8 @@ class MapDB:
 		#TODO: Error checking
 
 	def save_to_file(self, path):
+		if os.path.exists(path):
+			os.remove(path)
 		if is_valid_filename(path) and path.endswith(".world.db"):
 			file = sqlite3.connect(path)
 			self.dbcon.backup(file)
