@@ -17,11 +17,11 @@ class MapDB:
 		self.dbcon.execute("CREATE TABLE tile (tile_id INTEGER PRIMARY KEY, tile_x \
 			INTEGER NOT NULL, tile_y INTEGER NOT NULL, tile_elevation float NOT NULL,\
 			 tile_precipitation INTEGER, tile_temp INTEGER, tile_type TEXT, \
-			 UNIQUE(tile_x, tile_y));")
+			 tile_mv_cost FLOAT, UNIQUE(tile_x, tile_y));")
 
-	def add_tile(self, id, x, y, elev, prec, temp, type):
+	def add_tile(self, id, x, y, elev, prec, temp, type, mv_cost):
 		self.dbcon.execute("INSERT INTO tile VALUES \
-			(?, ?, ?, ?, ?, ?, ?)", (id, x, y, elev, prec, temp, type))
+			(?, ?, ?, ?, ?, ?, ?, ?)", (id, x, y, elev, prec, temp, type, mv_cost))
 		self.dbcon.commit()
 		#TODO: Error checking
 
@@ -33,3 +33,24 @@ class MapDB:
 			self.dbcon.backup(file)
 		else:
 			print("error with file path")
+
+class ConfigDB:
+	def __init__(self, path="../config/map_settings.db"):
+		self.dbcon = sqlite3.connect(path)
+
+	def get_base_mv_cost(self, terrain) -> float:
+		cur = self.dbcon.execute("SELECT type_base_mv_cost FROM tile_types WHERE type_name = ?;", (terrain,))
+		results = list()
+		for row in cur:
+			results.append(row[0])
+		if len(results) > 1 :
+			print ("too many results for movement cost query")
+		return results[0]
+
+def main():
+	condb = ConfigDB()
+	print(condb.get_base_mv_cost("mountain"))
+
+if __name__ == '__main__':
+	main()
+
