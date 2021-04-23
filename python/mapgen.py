@@ -105,96 +105,25 @@ class MapGraph:
 		return self.edges[coord]
 
 	def precipitation_calc(self, tile_dict, tile_coord) -> float:
-		"""This function uses pathfinding to find the adjusted distance--
-		ie the total elevation of all tiles intervening--
-		and that adjusted distance is then used to generate a precipitation rating
-		between 0-100"""
-		if tile_dict[tile_coord].tile_type == "ocean":
-			return 100
-		elif tile_dict[tile_coord].tile_type == "mountain":
-			return 0
-		startpoint = tile_coord
-		#The following block is an implementation of Dijkstra's algorithm. The exit condition
-		#is finding any ocean tile
-		frontier = queue.PriorityQueue()
-		frontier.put((0, startpoint))
-		came_from = dict()
-		cost_so_far = dict()
-		came_from[startpoint] = None
-		cost_so_far[startpoint] = 0
+		"""This function"""
+		q = queue.Queue()
+		distance_dict = dict()
+		for coord, tile in tile_dict.items():
+			distance_dict[coord] = math.inf
+			if tile.tile_type == "ocean":
+				queue.put(tile)
+				distance_dict[coord] = 0
+		while not q.empty():
+			coastal = False
+			current = q.get()
+			neighbors = self.neighbors((current.xCord, current.yCord))
+			for neighbor in neighbors:
+				if tile_dict[neighbor].tile_type != "ocean":
+					coastal = True
+					break
+			if not coastal:
+				q.put()
 
-		nearest_ocean_coord: tuple
-		i = 0
-		while not frontier.empty():
-			i+= 1
-			if i >= self.map_config.width*self.map_config.height:
-				print("loop ran more than " + str(i) + " times")
-				break
-			current = frontier.get()
-			current = current[1]
-
-			# print(current)
-			if tile_dict[current].tile_type == "ocean":
-				nearest_ocean_coord = current
-				break
-			for neighbor in self.neighbors(current):
-				if len(self.neighbors(current)) < 8:
-					if current[0] != 0 and current[0] != self.map_config.width-1 and current[1] != 0 and current[1] != self.map_config.height-1:
-						print(str(current) + " " + str(len(self.neighbors(current))))
-						print("Neighbors: " + str(self.neighbors(current)))
-				new_cost = cost_so_far[current] + self.tile_dict[neighbor].elevation
-				if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
-					cost_so_far[neighbor] = new_cost
-					priority = new_cost
-					frontier.put((priority, neighbor))
-					came_from[neighbor] = current
-
-		path = []
-
-		try: 
-			current = nearest_ocean_coord
-		except:
-			print(tile_dict[tile_coord].elevation)
-			print(tile_coord)
-			print("invalid nearest ocean")
-			if tile_coord == (199,99):
-				texgen.draw_mountain_map(tile_dict,\
-				"mountain_map.png",self.map_config.width, self.map_config.height, 50)
-			return 0
-
-		distance = 0
-		i=0
-		while current != startpoint:
-			i+= 1
-			if i >= 100:
-				break
-			path.append(current)
-			distance += self.tile_dict[current].elevation
-			if current not in came_from:
-				print("path error")
-				print(tile_coord)
-				# print(path)
-				# print(came_from)
-				texgen.draw_mountain_map(tile_dict,"mountain_map.png",self.map_config.width, self.map_config.height, 50)
-			current = came_from[current]
-		neighbor_ocean = list()
-		for neighbor in self.neighbors(tile_coord):
-			if self.tile_dict[neighbor].tile_type == "ocean":
-				neighbor_ocean.append(neighbor)
-		if len(neighbor_ocean) > 0 and nearest_ocean_coord not in neighbor_ocean:
-			print("current" + str(tile_coord))
-			print("neighboring ocean: " + str(neighbor_ocean))
-			print("found ocean: " + str(nearest_ocean_coord))
-			print("path: " + str(path))
-
-
-		max_distance = 10000 #This is currently just an initial number. Once map sizes are decided upon this should scale with map size
-		precipitation = 100 - helper.linearConversion(distance, 0,1000,0,100)
-		if precipitation < 0:
-			precipitation = 0
-		elif precipitation > 100:
-			precipitation = 100
-		return precipitation
 
 	def generate_tile_dict(self, mapconfig, noiseConfig) -> dict:
 		settings = db.ConfigDB()
