@@ -1,6 +1,18 @@
 import os
 import sqlite3
+from dataclasses import dataclass
 from pathvalidate import is_valid_filename
+
+@dataclass
+class MapConfig:
+	width: int
+	height: int
+	sea_level: float
+	mountain_level: float
+	octaves: int
+	freq: float
+	exp: float
+
 
 class MapDB:
 	def __init__(self, path=""):
@@ -39,13 +51,38 @@ class ConfigDB:
 		self.dbcon = sqlite3.connect(path)
 
 	def get_base_mv_cost(self, terrain) -> float:
-		cur = self.dbcon.execute("SELECT type_base_mv_cost FROM tile_types WHERE type_name = ?;", (terrain,))
+		cur = self.dbcon.execute("SELECT type_base_mv_cost FROM tile_types WHERE\
+		 type_name = ?;", (terrain,))
 		results = list()
 		for row in cur:
 			results.append(row[0])
 		if len(results) > 1 :
 			print ("too many results for movement cost query")
 		return results[0]
+
+	def get_type_color(self, t_type) -> str:
+		cur = self.dbcon.execute("SELECT type_img_color FROM tile_types WHERE\
+			type_name = ?;", (t_type,))
+		results = list()
+		for row in cur:
+			results.append(row[0])
+		if len(results) > 1:
+			print ("too many results for color query")
+		return results[0]
+
+	def get_script_config(self, script):
+		cur = self.dbcon.execute("SELECT * FROM map_scripts \
+			WHERE script_name = ?;", (script,))
+		rows = list()
+		for row in cur:
+			rows.append(row)
+		if len(rows) > 1:
+			print("too many results for map_script query")
+		results = rows[0]
+		return MapConfig( results[1], results[2], \
+			results[3], results[4], results[5], results[6], results[7])
+
+
 
 def main():
 	condb = ConfigDB()

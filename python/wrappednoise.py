@@ -1,5 +1,6 @@
 #Standard Library
 import time
+import statistics
 
 #Third Party
 from opensimplex import OpenSimplex
@@ -40,6 +41,30 @@ class WrappedNoise:
 		output = pow(output, self.conf.exp)
 		return output
 
+	def transform_noise_list(self, input, new_mean, new_sd):
+		"""Calculates mean and standard deviation of the list given, then 
+		transforms the list to have new_mean and new_sd"""
+		mean = statistics.mean(input)
+		stdev = statistics.pstdev(input, mean)
+
+		mean_scaled_input = [(x-mean) for x in input]
+		st_dev_transformed = [x * (new_sd/stdev) for x in mean_scaled_input]
+		mean_scaled_output = [x + new_mean for x in st_dev_transformed]
+		#Found on stack exchange post about transforming mean and stdev of dataset
+		return mean_scaled_output
+
+
+	def produce_noise_list_percent(self, sizex, sizey):
+		"""Produces a list of floats between 0 to 100"""
+		results = list()
+		for y in range(0,sizey):
+			row = list()
+			for x in range(0,sizex):
+				percent = self.noise_at_point(x, y)
+				percent = noise_to_percent(percent)
+				results.append(percent)
+		return results
+
 def noise_to_percent(input: float):
 	return (((input + 1) * 100)/ 2)
 
@@ -62,9 +87,9 @@ if __name__ == "__main__":
 	w.conf = n2
 	print(w.noise_at_point(100,200))
 
-	testConfig = NoiseConfig(1,1,1)
-	w.conf = testConfig
-	w.noise = OpenSimplex()
+	noise_list = w.produce_noise_list_percent(20, 10)
+	transformed = w.transform_noise_list(noise_list, 40, statistics.pstdev(noise_list))
+	print(statistics.mean(transformed))
 
 
 	
