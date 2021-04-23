@@ -53,8 +53,8 @@ class MapTile:
 			elif self.precipitation > 70:
 				tile_type = "tropical_forest"
 
-		if self.precipitation == 0:
-			tile_type = "test_no_prec"
+		# if self.precipitation == 0:
+		# 	tile_type = "test_no_prec"
 
 		return tile_type
 
@@ -88,7 +88,8 @@ class MapGraph:
 				for x in range(-1,2):
 					# print("Checking: " + str(x) + ", " + str(y))
 					if (coord[0]+x, coord[1]+y) in self.tile_dict and (coord[0]+x, coord[1]+y) != coord:
-						self.edges[coord].append((coord[0]+x, coord[1]+y))
+						if self.tile_dict[coord[0]+x, coord[1]+y].tile_type != "mountain":
+							self.edges[coord].append((coord[0]+x, coord[1]+y))
 						
 					# else:
 					# 	print("not added: " + str((coord[0]+ x, coord[1]+y)))
@@ -116,7 +117,7 @@ class MapGraph:
 		#The following block is an implementation of Dijkstra's algorithm. The exit condition
 		#is finding any ocean tile
 		frontier = queue.PriorityQueue()
-		frontier.put(startpoint, 0)
+		frontier.put((0, startpoint))
 		came_from = dict()
 		cost_so_far = dict()
 		came_from[startpoint] = None
@@ -130,21 +131,23 @@ class MapGraph:
 				print("loop ran more than " + str(i) + " times")
 				break
 			current = frontier.get()
+			current = current[1]
+
 			# print(current)
 			if tile_dict[current].tile_type == "ocean":
 				nearest_ocean_coord = current
 				break
-			for next in self.neighbors(current):
-				# if len(self.neighbors(current)) < 8:
-				# 	if current[0] != 0 and current[0] != self.map_config.width-1 and current[1] != 0 and current[1] != self.map_config.height:
-				# 		print(str(current) + " " + str(len(self.neighbors(current))))
-				# 		print("Neighbors: " + str(self.neighbors(current)))
-				new_cost = cost_so_far[current] + self.tile_dict[next].elevation
-				if next not in cost_so_far:
-					cost_so_far[next] = new_cost
+			for neighbor in self.neighbors(current):
+				if len(self.neighbors(current)) < 8:
+					if current[0] != 0 and current[0] != self.map_config.width-1 and current[1] != 0 and current[1] != self.map_config.height-1:
+						print(str(current) + " " + str(len(self.neighbors(current))))
+						print("Neighbors: " + str(self.neighbors(current)))
+				new_cost = cost_so_far[current] + self.tile_dict[neighbor].elevation
+				if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
+					cost_so_far[neighbor] = new_cost
 					priority = new_cost
-					frontier.put(next, priority)
-					came_from[next] = current
+					frontier.put((priority, neighbor))
+					came_from[neighbor] = current
 
 		path = []
 
@@ -174,6 +177,15 @@ class MapGraph:
 				# print(came_from)
 				texgen.draw_mountain_map(tile_dict,"mountain_map.png",self.map_config.width, self.map_config.height, 50)
 			current = came_from[current]
+		neighbor_ocean = list()
+		for neighbor in self.neighbors(tile_coord):
+			if self.tile_dict[neighbor].tile_type == "ocean":
+				neighbor_ocean.append(neighbor)
+		if len(neighbor_ocean) > 0 and nearest_ocean_coord not in neighbor_ocean:
+			print("current" + str(tile_coord))
+			print("neighboring ocean: " + str(neighbor_ocean))
+			print("found ocean: " + str(nearest_ocean_coord))
+			print("path: " + str(path))
 
 
 		max_distance = 10000 #This is currently just an initial number. Once map sizes are decided upon this should scale with map size
