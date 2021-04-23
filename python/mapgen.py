@@ -69,15 +69,11 @@ class MapGraph:
 		self.edges: Dict[tuple, list[tuple]] = {}
 
 		self.generate_edges()
-		ocean_present = False
+		prec_dict = self.precipitation_calc()
 		for tile in self.tile_dict:
-			if self.tile_dict[tile].tile_type == "ocean":
-				ocean_present = True
-		if ocean_present:
-			for tile in self.tile_dict:
-				self.tile_dict[tile].precipitation = self.precipitation_calc(self.tile_dict, tile)
-				if self.tile_dict[tile].tile_type == "Unassigned":
-					self.tile_dict[tile].tile_type = self.tile_dict[tile].calculate_type()
+			self.tile_dict[tile].precipitation = prec_dict[tile]
+			if self.tile_dict[tile].tile_type == "Unassigned":
+				self.tile_dict[tile].tile_type = self.tile_dict[tile].calculate_type()
 		texgen.draw_mountain_map(self.tile_dict,\
 				"mountain_map.png",self.map_config.width, self.map_config.height, 50)
 
@@ -101,28 +97,84 @@ class MapGraph:
 
 
 
-	def neighbors(self, coord: tuple) -> list[int]:
+	def neighbors(self, coord: tuple) -> list[tuple]:
 		return self.edges[coord]
 
-	def precipitation_calc(self, tile_dict, tile_coord) -> float:
-		"""This function"""
+	def precipitation_calc(self) -> dict:
+		"""This function returns a dict of precipitation values using coordinates as keys.
+		The algorithm starts by adding all ocean tiles to a queue, then removing the tiles that
+		border land tiles. Then each tile neighboring one of the coastal ocean tiles has its distance
+		to the ocean calculated and that tile is added to the queue. Then neighbors of those tiles and
+		so forth. This seemed more performant than the main branch, where a path is found using dijkstra's
+		algorithm to any ocean tile for every land tile.
+
+		This actually did end up being roughly 4 times as fast for n = 20,000"""
+		oceans = queue.Queue()
 		q = queue.Queue()
 		distance_dict = dict()
-		for coord, tile in tile_dict.items():
+
+		#Get all ocean tiles
+		for coord, tile in self.tile_dict.items():
 			distance_dict[coord] = math.inf
 			if tile.tile_type == "ocean":
-				queue.put(tile)
+				oceans.put(coord)
 				distance_dict[coord] = 0
-		while not q.empty():
+
+		#Loop through all ocean tiles and add ones that have at least one non-ocean neighbor to a new queue
+		while not oceans.empty():
 			coastal = False
-			current = q.get()
-			neighbors = self.neighbors((current.xCord, current.yCord))
+			current = oceans.get()
+			neighbors = self.neighbors((current))
 			for neighbor in neighbors:
-				if tile_dict[neighbor].tile_type != "ocean":
+				if self.tile_dict[neighbor].tile_type != "ocean":
 					coastal = True
 					break
-			if not coastal:
-				q.put()
+			if coastal:
+				q.put(current)
+
+		while not q.empty():
+			current = q.get()
+			neighbors = self.neighbors((current))
+			for neighbor in neighbors:
+				if self.tile_dict[neighbor].tile_type != "ocean":
+					new_distance = distance_dict[current] + (self.tile_dict[neighbor].elevation-self.map_config.sea_level)
+					if neighbor not in distance_dict or new_distance < distance_dict[neighbor]:
+						distance_dict[neighbor] = new_distance
+						q.put(neighbor)
+
+		distance_scaling = 2.0 # This variable is used to scale the distances exponentially, 
+								#increasing the weight of higher altitudes on the precipitation calculation
+		distance_cutoff_percent = 0.5 #This variable sets a limit for 0 precipitation 
+										#in terms of percentage of highest elevation on map
+		for coord, distance in distance_dict.items():
+			distance_dict[coord] = pow(distance_dict[coord], distance_scaling)
+		distance_list = distance_dict.values()
+
+		max_distance = max(distance_list)
+		max_distance *= distance_cutoff_percent
+		prec_dict = dict()
+		for coord, distance in distance_dict.items():
+			prec_dict[coord] = helper.linearConversion(distance, 0, max_distance, 0, 100)
+			prec_dict[coord] = max(0,100 - prec_dict[coord])
+
+		return prec_dict
+
+	def temperature_calc(self, latitude, altitude) -> float:
+		temperature = math.cos(math.radians(y_to_lat_theta(float(latitude), float(self.map_config.height))))
+		temperature = helper.linearConversion(temperature, -1, 1, 0, 100)
+		alt_factor = (altitude-self.map_config.sea_level)/3
+		alt_factor = pow(alt_factor, 2)
+		if altitude-self.map_config.sea_level < 0:
+			alt_factor *= -1
+		temperature -= alt_factor
+		print(alt_factor)
+		if temperature > 100:
+			temperature = 100.0
+		if temperature < 0:
+			temperature = 0
+
+		return temperature
+
 
 
 	def generate_tile_dict(self, mapconfig, noiseConfig) -> dict:
@@ -141,14 +193,7 @@ class MapGraph:
 				x = 0
 				y+=1
 			el = adjusted_noise[i]
-			temperature = math.cos(math.radians(y_to_lat_theta(float(y), float(mapconfig.height))))
-			temperature = ((temperature + 1.0) * 100.0)/ 2.0
-			alt_factor = (el-mapconfig.sea_level)/10.0
-			temperature -= alt_factor
-			if temperature > 100:
-				temperature = 100.0
-			if temperature < 0:
-				temperature = 0
+			temperature = self.temperature_calc(y,el)
 			tileDict[(x,y)] = MapTile(x,y,el,0,temperature, i, 0)
 			tileDict[(x,y)].tile_mv_cost = settings.get_base_mv_cost(tileDict[(x,y)].tile_type)
 			if el <= mapconfig.sea_level:
@@ -157,6 +202,7 @@ class MapGraph:
 				tileDict[(x,y)].tile_type = "mountain"
 			x += 1
 		return tileDict
+
 
 
 

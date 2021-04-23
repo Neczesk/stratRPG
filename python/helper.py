@@ -5,3 +5,6 @@ def linearConversion(input, oldmin, oldmax, newmin, newmax):
 		return input
 	else:
 		return (((input - oldmin) * newrange)/ oldrange) + newmin
+
+if __name__ == "__main__":
+	print (linearConversion(110, 0, 100, 0, 10))
