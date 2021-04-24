@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw, ImageColor
+from PIL import Image, ImageDraw, ImageColor, ImageChops
 
 import db
 import helper
@@ -45,14 +45,18 @@ def draw_mountain_map(tile_dict, path, width, height, scale):
 		im.save(path, "PNG")
 
 def draw_height_map(tile_dict, path, width, height, scale):
-	with Image.new("L",(width*scale, height*scale)) as im:
+	with Image.new("RGB",(width*scale, height*scale)) as im:
 		draw = ImageDraw.Draw(im)
 		for coord, tile in tile_dict.items():
 			el = round(tile.elevation, -1)
-			value = helper.linearConversion(el, 0, 100, 0, 255)
+			value = int(el)
+			# value = 100 - value
 			draw.rectangle([(coord[0]*scale, coord[1]*scale), \
-				((coord[0]+1)*scale, (coord[1]+1)*scale)], int(value))
+				((coord[0]+1)*scale, (coord[1]+1)*scale)], ImageColor.getrgb("hsv(0,0%,"+str(value)+"%)"))
 		im.save(path, "PNG")
 
-def create_physical_map(terrain_map, height_map):
-	
+def create_physical_map(terrain_map_path, height_map_path, path):
+	with Image.open(terrain_map_path) as terrain_map:
+		with Image.open(height_map_path) as height_map:
+			im = ImageChops.hard_light(terrain_map, height_map)
+			im.save(path, "PNG")

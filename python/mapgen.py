@@ -232,6 +232,7 @@ if __name__ == "__main__":
 	# print(color_list)
 	texgen.draw_terrain_map(color_list, "map.png", 50)
 	texgen.draw_height_map(new_map.tile_dict, "heightmap.png",map_config.width, map_config.height, 50)
+	texgen.create_physical_map("map.png", "heightmap.png", "phys_map.png")
 	for cord, tile in new_map.tile_dict.items():
 		database.add_tile(tile.tile_id, tile.xCord, tile.yCord, tile.elevation,\
 			tile.precipitation, tile.temperature, tile.tile_type, tile.tile_mv_cost)
