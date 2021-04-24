@@ -53,3 +53,6 @@ def draw_height_map(tile_dict, path, width, height, scale):
 			draw.rectangle([(coord[0]*scale, coord[1]*scale), \
 				((coord[0]+1)*scale, (coord[1]+1)*scale)], int(value))
 		im.save(path, "PNG")
+
+def create_physical_map(terrain_map, height_map):
+	

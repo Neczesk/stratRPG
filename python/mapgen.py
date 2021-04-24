@@ -162,12 +162,12 @@ class MapGraph:
 	def temperature_calc(self, latitude, altitude) -> float:
 		temperature = math.cos(math.radians(y_to_lat_theta(float(latitude), float(self.map_config.height))))
 		temperature = helper.linearConversion(temperature, -1, 1, 0, 100)
-		alt_factor = (altitude-self.map_config.sea_level)/3
+		alt_factor = (altitude-self.map_config.sea_level)/2
 		alt_factor = pow(alt_factor, 2)
 		if altitude-self.map_config.sea_level < 0:
 			alt_factor *= -1
 		temperature -= alt_factor
-		print(alt_factor)
+
 		if temperature > 100:
 			temperature = 100.0
 		if temperature < 0:
