@@ -139,6 +139,6 @@ cython_debug/
 
 #project ignores
 *.world.db
-
+python/*.png
 #Kyle ignores
 *.DS_Store
