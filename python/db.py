@@ -12,6 +12,13 @@ class MapConfig:
 	octaves: int
 	freq: float
 	exp: float
+	persistence: float
+	prec_octaves: float
+	prec_freq: float
+	prec_persistence: float
+	temp_octaves: float
+	temp_freq: float
+	temp_persistence: float
 
 
 class MapDB:
@@ -71,7 +78,9 @@ class ConfigDB:
 		return results[0]
 
 	def get_script_config(self, script):
-		cur = self.dbcon.execute("SELECT * FROM map_scripts \
+		cur = self.dbcon.execute("SELECT script_name, script_width, script_height, script_sea_level, script_mountain_level, script_octaves,\
+		 script_frequency, script_exp, script_persistence, script_prec_octaves, script_prec_frequency, script_prec_persistence, \
+		 script_temp_octaves, script_temp_frequency, script_temp_persistence FROM map_scripts \
 			WHERE script_name = ?;", (script,))
 		rows = list()
 		for row in cur:
@@ -80,7 +89,7 @@ class ConfigDB:
 			print("too many results for map_script query")
 		results = rows[0]
 		return MapConfig( results[1], results[2], \
-			results[3], results[4], results[5], results[6], results[7])
+			results[3], results[4], results[5], results[6], results[7], results[8], results[9], results[10], results[11], results[12], results[13], results[14])
 
 
 

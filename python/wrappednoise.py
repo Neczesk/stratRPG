@@ -10,11 +10,13 @@ class NoiseConfig:
 	oc: int #octaves
 	freq: float
 	exp: float #exponent
+	persistence: float
 
-	def __init__(self, o, f, e):
+	def __init__(self, o, f, e, p = 0.5):
 		self.oc = o
 		self.freq = f
 		self.exp = e
+		self.persistence = p
 
 class WrappedNoise:
 	def __init__(self, config):
@@ -36,7 +38,7 @@ class WrappedNoise:
 			divisor += octfac
 			output += octfac * \
 			self.noise.noise2d(self.conf.freq * pow(2,i) * x, self.conf.freq * pow(2,i)*y)
-			octfac *= 0.5
+			octfac *= self.conf.persistence
 		output = output / divisor
 		output = pow(output, self.conf.exp)
 		return output
