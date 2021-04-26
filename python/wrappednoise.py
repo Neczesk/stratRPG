@@ -17,6 +17,7 @@ class NoiseConfig:
 		self.freq = f
 		self.exp = e
 		self.persistence = p
+		print(self.oc)
 
 class WrappedNoise:
 	def __init__(self, config):
@@ -34,7 +35,8 @@ class WrappedNoise:
 		output = 0.0
 		divisor = 0.0
 		octfac = 1.0
-		for i in range(0,self.conf.oc):
+
+		for i in range(0,int(self.conf.oc)):
 			divisor += octfac
 			output += octfac * \
 			self.noise.noise2d(self.conf.freq * pow(2,i) * x, self.conf.freq * pow(2,i)*y)

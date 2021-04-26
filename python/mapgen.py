@@ -15,8 +15,8 @@ class MapTile:
 	xCord: int
 	yCord: int
 	elevation: int
-	precipitation: int
-	temperature: int
+	precipitation: float
+	temperature: float
 	tile_type: str
 	tile_id: int
 	tile_mv_cost: float
@@ -62,20 +62,29 @@ class MapGraph:
 	tile_dict: dict
 	def __init__(self, mapconfig):
 		self.noise_config = wrappednoise.NoiseConfig\
-		(mapconfig.octaves,mapconfig.freq,mapconfig.exp)
+		(mapconfig.octaves,mapconfig.freq,mapconfig.exp, \
+			mapconfig.persistence)
 		self.map_config = mapconfig
-		self.tile_dict = self.generate_tile_dict(self.map_config, self.noise_config)
+		self.tile_dict = self.generate_tile_dict(self.map_config, \
+			self.noise_config)
 
 		self.edges: Dict[tuple, list[tuple]] = {}
-
 		self.generate_edges()
+		
 		prec_dict = self.precipitation_calc()
 		for tile in self.tile_dict:
 			self.tile_dict[tile].precipitation = prec_dict[tile]
-			if self.tile_dict[tile].tile_type == "Unassigned":
-				self.tile_dict[tile].tile_type = self.tile_dict[tile].calculate_type()
+
+		self.noise_modify_prec()
+		self.noise_modify_temp()
+
+		for coord, tile in self.tile_dict.items():
+			if tile.tile_type == "Unassigned":
+					tile.tile_type = tile.calculate_type()
+
 		texgen.draw_mountain_map(self.tile_dict,\
-				"mountain_map.png",self.map_config.width, self.map_config.height, 50)
+				"mountain_map.png",self.map_config.width, \
+				self.map_config.height, 50)
 
 	def generate_edges(self):
 		for coord, tile in self.tile_dict.items():
@@ -83,17 +92,38 @@ class MapGraph:
 			for y in range(-1,2):
 				for x in range(-1,2):
 					# print("Checking: " + str(x) + ", " + str(y))
-					if (coord[0]+x, coord[1]+y) in self.tile_dict and (coord[0]+x, coord[1]+y) != coord:
-						if self.tile_dict[coord[0]+x, coord[1]+y].tile_type != "mountain":
-							self.edges[coord].append((coord[0]+x, coord[1]+y))
-						
-					# else:
-					# 	print("not added: " + str((coord[0]+ x, coord[1]+y)))
-			# if len(self.edges[coord]) < 8:
-			# 				print(coord)
-			# 				print(self.edges[coord])
+					if (coord[0]+x, coord[1]+y) in self.tile_dict and\
+					 (coord[0]+x, coord[1]+y) != coord:
+						if self.tile_dict[coord[0]+x, \
+						coord[1]+y].tile_type != "mountain":
+							self.edges[coord].append((coord[0]+x, \
+								coord[1]+y))
 
+	def noise_modify_prec(self):
+		prec_noise_config = wrappednoise.NoiseConfig\
+		(map_config.prec_octaves, map_config.prec_freq, \
+			map_config.prec_persistence)
+		prec_noise = wrappednoise.WrappedNoise(prec_noise_config)
 
+		for coord, tile in self.tile_dict.items():
+			prec_mod = prec_noise.noise_at_point(coord[0], coord[1])
+			prec_mod = helper.linearConversion(prec_mod, -1, 1, -30, 30)
+			if abs(prec_mod) > 15:
+				print("big noise mod")
+			tile.precipitation += prec_mod
+			tile.precipitation = helper.clamp(tile.precipitation, 0, 100)
+
+	def noise_modify_temp(self):
+		temp_noise_config = wrappednoise.NoiseConfig\
+		(map_config.temp_octaves, map_config.temp_freq, \
+			map_config.temp_persistence)
+		temp_noise = wrappednoise.WrappedNoise(temp_noise_config)
+
+		for coord, tile in self.tile_dict.items():
+			temp_mod = temp_noise.noise_at_point(coord[0], coord[1])
+			temp_mod = helper.linearConversion(temp_mod, -1, 1, -30, 30)
+			tile.temperature += temp_mod
+			tile.temperature = helper.clamp(tile.temperature, 0, 100)
 
 
 
