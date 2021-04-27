@@ -60,7 +60,11 @@ class MapTile:
 
 class MapSubTile:
 	"""This class represents the smallest, indivisible points on the map. Entities can move through these subtiles and structures can exist on them."""
-	pass
+	def __init__(self, noise, tile, x, y):
+		self.subcoord = (x,y)
+		self.globalcoord = (tile.xCord + (x/10), tile.yCord + (y/10))
+		self.elevation = noise.noise_at_point(globalcoord[0],globalcoord[1])
+
 class MapGraph:
 	tile_dict: dict
 	def __init__(self, mapconfig):
