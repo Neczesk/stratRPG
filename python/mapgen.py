@@ -101,9 +101,10 @@ class MapGraph:
 
 	def noise_modify_prec(self):
 		prec_noise_config = wrappednoise.NoiseConfig\
-		(map_config.prec_octaves, map_config.prec_freq, \
+		(map_config.prec_octaves, map_config.prec_freq, 1, \
 			map_config.prec_persistence)
 		prec_noise = wrappednoise.WrappedNoise(prec_noise_config)
+		texgen.noise_visualize(prec_noise, self.map_config.width, self.map_config.height, 50, "prec_noise.png")
 
 		for coord, tile in self.tile_dict.items():
 			prec_mod = prec_noise.noise_at_point(coord[0], coord[1])
@@ -115,7 +116,7 @@ class MapGraph:
 
 	def noise_modify_temp(self):
 		temp_noise_config = wrappednoise.NoiseConfig\
-		(map_config.temp_octaves, map_config.temp_freq, \
+		(map_config.temp_octaves, map_config.temp_freq, 1,\
 			map_config.temp_persistence)
 		temp_noise = wrappednoise.WrappedNoise(temp_noise_config)
 

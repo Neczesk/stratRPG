@@ -17,7 +17,7 @@ class NoiseConfig:
 		self.freq = f
 		self.exp = e
 		self.persistence = p
-		print(self.oc)
+		print(self.exp)
 
 class WrappedNoise:
 	def __init__(self, config):
@@ -42,7 +42,12 @@ class WrappedNoise:
 			self.noise.noise2d(self.conf.freq * pow(2,i) * x, self.conf.freq * pow(2,i)*y)
 			octfac *= self.conf.persistence
 		output = output / divisor
+		if isinstance(output, complex):
+			print("output is complex before exp")
 		output = pow(output, self.conf.exp)
+		if isinstance(output, complex):
+			print("output is complex after exp")
+			print(self.conf.exp)
 		return output
 
 	def transform_noise_list(self, input, new_mean, new_sd):

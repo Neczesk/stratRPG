@@ -60,3 +60,18 @@ def create_physical_map(terrain_map_path, height_map_path, path):
 		with Image.open(height_map_path) as height_map:
 			im = ImageChops.hard_light(terrain_map, height_map)
 			im.save(path, "PNG")
+
+def noise_visualize(noise_generator, width, height, scale, path):
+	with Image.new("L", (width*scale, height*scale)) as im:
+		draw = ImageDraw.Draw(im, "L")
+		for y in range(0, height):
+			for x in range(0, width):
+				noise_value = noise_generator.noise_at_point(x, y)
+				noise_value = helper.linearConversion(noise_value, -1, 1, 0, 255)
+				noise_value = int(noise_value)
+				print(noise_value)
+				print(x*scale)
+				print(y*scale)
+			draw.rectangle([(x*scale, y*scale), \
+				((x+1)*scale, (y+1)*scale)], noise_value)
+		im.save(path, "PNG")

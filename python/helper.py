@@ -7,6 +7,8 @@ def linearConversion(input, oldmin, oldmax, newmin, newmax):
 		return (((input - oldmin) * newrange)/ oldrange) + newmin
 
 def clamp(input, minval, maxval):
+	if isinstance(input, complex):
+		print(input)
 	return max(maxval, min(input, maxval))
 
 if __name__ == "__main__":
