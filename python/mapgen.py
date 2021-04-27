@@ -11,7 +11,7 @@ import helper
 import texgen
 
 class MapTile:
-	"""This class represents a single space on the map through which entities can move or exist on."""
+	"""This class represents a slightly larger region of the map, with a single climate."""
 	xCord: int
 	yCord: int
 	elevation: int
@@ -58,6 +58,9 @@ class MapTile:
 
 		return tile_type
 
+class MapSubTile:
+	"""This class represents the smallest, indivisible points on the map. Entities can move through these subtiles and structures can exist on them."""
+	pass
 class MapGraph:
 	tile_dict: dict
 	def __init__(self, mapconfig):
@@ -109,8 +112,6 @@ class MapGraph:
 		for coord, tile in self.tile_dict.items():
 			prec_mod = prec_noise.noise_at_point(coord[0], coord[1])
 			prec_mod = helper.linearConversion(prec_mod, -1, 1, -30, 30)
-			if abs(prec_mod) > 15:
-				print("big noise mod")
 			tile.precipitation += prec_mod
 			tile.precipitation = helper.clamp(tile.precipitation, 0, 100)
 
@@ -123,6 +124,8 @@ class MapGraph:
 		for coord, tile in self.tile_dict.items():
 			temp_mod = temp_noise.noise_at_point(coord[0], coord[1])
 			temp_mod = helper.linearConversion(temp_mod, -1, 1, -30, 30)
+			if abs(temp_mod) > 30:
+				print("abs temp mod exceeds 30")
 			tile.temperature += temp_mod
 			tile.temperature = helper.clamp(tile.temperature, 0, 100)
 

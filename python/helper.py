@@ -9,7 +9,7 @@ def linearConversion(input, oldmin, oldmax, newmin, newmax):
 def clamp(input, minval, maxval):
 	if isinstance(input, complex):
 		print(input)
-	return max(maxval, min(input, maxval))
+	return max(minval, min(input, maxval))
 
 if __name__ == "__main__":
 	print (linearConversion(110, 0, 100, 0, 10))
