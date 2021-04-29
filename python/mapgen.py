@@ -3,6 +3,7 @@ import math
 from dataclasses import dataclass
 import queue
 import statistics
+import decimal
 
 #Local Imports
 import wrappednoise
@@ -61,12 +62,13 @@ class MapTile:
 class MapSubTile:
 	"""This class represents the smallest, indivisible points on the map. Entities can move through these subtiles and structures can exist on them."""
 	def __init__(self, noise, tile, x, y):
-		self.subcoord = (x,y)
-		self.globalcoord = (tile.xCord + (x/10), tile.yCord + (y/10))
-		self.elevation = noise.noise_at_point(globalcoord[0],globalcoord[1])
-
+		self.subcoord = (decimal.Decimal(x),decimal.Decimal(y))
+		self.globalcoord = (tile.xCord +(x/10), tile.yCord + (y/10))
+		self.elevation = noise.noise_at_point(float(self.globalcoord[0]), float(self.globalcoord[1]))
+		self.subtile_type = "Unassigned"
 class MapGraph:
-	tile_dict: dict
+	tile_dict = dict()
+	subtile_dict = dict()
 	def __init__(self, mapconfig):
 		self.noise_config = wrappednoise.NoiseConfig\
 		(mapconfig.octaves,mapconfig.freq,mapconfig.exp, \
@@ -218,7 +220,7 @@ class MapGraph:
 	def generate_tile_dict(self, mapconfig, noiseConfig) -> dict:
 		settings = db.ConfigDB()
 		noise = wrappednoise.WrappedNoise(noiseConfig)
-		tileDict = dict()
+		tile_dict = dict()
 		x = 0
 		y = 0
 		base_noise = noise.produce_noise_list_percent(mapconfig.width,\
@@ -232,14 +234,20 @@ class MapGraph:
 				y+=1
 			el = adjusted_noise[i]
 			temperature = self.temperature_calc(y,el)
-			tileDict[(x,y)] = MapTile(x,y,el,0,temperature, i, 0)
-			tileDict[(x,y)].tile_mv_cost = settings.get_base_mv_cost(tileDict[(x,y)].tile_type)
+			tile_dict[(x,y)] = MapTile(x,y,el,0,temperature, i, 0)
+			tile_dict[(x,y)].tile_mv_cost = settings.get_base_mv_cost(tile_dict[(x,y)].tile_type)
 			if el <= mapconfig.sea_level:
-				tileDict[(x,y)].tile_type = "ocean"
+				tile_dict[(x,y)].tile_type = "ocean"
 			if el >= mapconfig.mountain_level:
-				tileDict[(x,y)].tile_type = "mountain"
+				tile_dict[(x,y)].tile_type = "mountain"
 			x += 1
-		return tileDict
+
+		for coord, tile in tile_dict.items():
+			for y in range(0, 5):
+				for x in range(0,5):
+					new_subtile = MapSubTile(noise, tile, x, y)
+					self.subtile_dict[new_subtile.globalcoord] = new_subtile
+		return tile_dict
 
 
 
@@ -258,6 +266,7 @@ def y_to_lat_theta(y, map_height):
 
 
 if __name__ == "__main__":
+
 	settings_db = db.ConfigDB()
 	map_config = settings_db.get_script_config("test")
 	new_map = MapGraph(map_config)
@@ -268,6 +277,7 @@ if __name__ == "__main__":
 	for row in type_list:
 		color_list.append(texgen.type_list_to_color_list(row))
 	# print(color_list)
+
 	texgen.draw_terrain_map(color_list, "map.png", 50)
 	texgen.draw_height_map(new_map.tile_dict, "heightmap.png",map_config.width, map_config.height, 50)
 	texgen.create_physical_map("map.png", "heightmap.png", "phys_map.png")
