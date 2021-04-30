@@ -12,14 +12,41 @@ def tile_dict_to_type_lists(tile_dict, width, height) -> list:
 		row = list()
 		for x in range(width):
 			row.append(tile_dict[(x,y)].tile_type)
+			if tile_dict[(x,y)].tile_type == None:
+				print("tile_type none")
+				print(str((x,y)))
 		output.append(row)
 	return output
+
+def subtile_dict_to_type_lists(tile_dict, width, height) -> list:
+	output = list()
+	x=0
+	y=0
+
+	for y in range(0,height):
+		row = list()
+		for x in range(width):
+			row.append(tile_dict[(x,y)].subtile_type)
+			if tile_dict[(x,y)].subtile_type == None:
+				print("tile_type none")
+				print(str((x,y)))
+		output.append(row)
+	return output
+
+
 
 def type_list_to_color_list(type_list) -> list:
 	settings_db = db.ConfigDB()
 	output = list()
 	for t in type_list:
 		output.append("#" + settings_db.get_type_color(t))
+	return output
+
+def subtile_type_list_to_color_list(type_list) -> list:
+	settings_db = db.ConfigDB()
+	output = list()
+	for t in type_list:
+		output.append("#" + settings_db.get_subtile_type_color(t))
 	return output
 
 def draw_terrain_map(color_lists, path, scale):

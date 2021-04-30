@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import queue
 import statistics
 import decimal
+import random
 
 #Local Imports
 import wrappednoise
@@ -13,14 +14,6 @@ import texgen
 
 class MapTile:
 	"""This class represents a slightly larger region of the map, with a single climate."""
-	xCord: int
-	yCord: int
-	elevation: int
-	precipitation: float
-	temperature: float
-	tile_type: str
-	tile_id: int
-	tile_mv_cost: float
 	def __init__(self, x, y, e, p, t, id, mv_cost):
 		self.xCord = x
 		self.yCord = y
@@ -31,7 +24,11 @@ class MapTile:
 		self.tile_mv_cost = mv_cost
 		self.tile_type = "Unassigned"
 
-	def calculate_type(self) -> str:
+	def calculate_type(self, settings) -> str:
+		if self.elevation > settings.mountain_level:
+			return "mountain"
+		if self.elevation < settings.sea_level:
+			return "ocean"
 		if self.temperature <= 30:
 			if self.precipitation <= 30:
 				tile_type = "tundra"
@@ -53,23 +50,40 @@ class MapTile:
 				tile_type = "savannah"
 			elif self.precipitation > 70:
 				tile_type = "tropical_forest"
+		else:
+			print("error determining tile type")
+			print(self.temperature)
+			print(self.precipitation)
 
 		# if self.precipitation == 0:
 		# 	tile_type = "test_no_prec"
 
 		return tile_type
 
+	def change_type(self, new_type):
+		self.tile_type = new_type
+		settings = db.ConfigDB()
+		self.mv_cost = settings.get_base_mv_cost(new_type)
+		settings.close()
+
 class MapSubTile:
 	"""This class represents the smallest, indivisible points on the map. Entities can move through these subtiles and structures can exist on them."""
-	def __init__(self, noise, tile, x, y):
-		self.subcoord = (decimal.Decimal(x),decimal.Decimal(y))
-		self.globalcoord = (tile.xCord +(x/10), tile.yCord + (y/10))
+	def __init__(self, noise, tile, x, y, id):
+		self.subcoord = (x,y)
+		self.globalcoord = ((tile.xCord*5 + x), (tile.yCord*5 + y))
 		self.elevation = noise.noise_at_point(float(self.globalcoord[0]), float(self.globalcoord[1]))
 		self.subtile_type = "Unassigned"
+		self.parent = tile
+		self.id = id
+		self.mv_mod = 0
+
 class MapGraph:
-	tile_dict = dict()
-	subtile_dict = dict()
+
+
 	def __init__(self, mapconfig):
+		self.tile_dict = dict()
+		self.subtile_dict = dict()
+		self.subtile_coord_max = 4
 		self.noise_config = wrappednoise.NoiseConfig\
 		(mapconfig.octaves,mapconfig.freq,mapconfig.exp, \
 			mapconfig.persistence)
@@ -79,6 +93,10 @@ class MapGraph:
 
 		self.edges: Dict[tuple, list[tuple]] = {}
 		self.generate_edges()
+
+		self.subtile_edges: Dict[tuple, list[tuple]] = {}
+		self.generate_subtile_edges()
+		# print(self.subtile_edges)
 		
 		prec_dict = self.precipitation_calc()
 		for tile in self.tile_dict:
@@ -88,8 +106,18 @@ class MapGraph:
 		self.noise_modify_temp()
 
 		for coord, tile in self.tile_dict.items():
+			if tile.tile_type == None:
+				print("tile type is none before")
 			if tile.tile_type == "Unassigned":
-					tile.tile_type = tile.calculate_type()
+				new_type = tile.calculate_type(self.map_config)
+				tile.change_type(new_type)
+			if tile.tile_type == None:
+				print("tile type is none after")
+
+		for coord, tile in self.subtile_dict.items():
+			new_type = self.calculate_subtile_type(tile)
+			print(new_type)
+			tile.subtile_type = new_type
 
 		texgen.draw_mountain_map(self.tile_dict,\
 				"mountain_map.png",self.map_config.width, \
@@ -106,6 +134,17 @@ class MapGraph:
 						if self.tile_dict[coord[0]+x, \
 						coord[1]+y].tile_type != "mountain":
 							self.edges[coord].append((coord[0]+x, \
+								coord[1]+y))
+
+	def generate_subtile_edges(self):
+		for coord, subtile in self.subtile_dict.items():
+			self.subtile_edges[coord] = list()
+			for y in range(-1,2):
+				for x in range(-1,2):
+					# print("Checking: " + str(x) + ", " + str(y))
+					if (coord[0]+x, coord[1]+y) in self.subtile_dict and\
+					 (coord[0]+x, coord[1]+y) != coord:
+						self.subtile_edges[coord].append((coord[0]+x, \
 								coord[1]+y))
 
 	def noise_modify_prec(self):
@@ -134,6 +173,7 @@ class MapGraph:
 				print("abs temp mod exceeds 30")
 			tile.temperature += temp_mod
 			tile.temperature = helper.clamp(tile.temperature, 0, 100)
+
 
 
 
@@ -241,18 +281,172 @@ class MapGraph:
 			if el >= mapconfig.mountain_level:
 				tile_dict[(x,y)].tile_type = "mountain"
 			x += 1
-
+		id = 0
 		for coord, tile in tile_dict.items():
 			for y in range(0, 5):
 				for x in range(0,5):
-					new_subtile = MapSubTile(noise, tile, x, y)
+					new_subtile = MapSubTile(noise, tile, x, y, i)
 					self.subtile_dict[new_subtile.globalcoord] = new_subtile
+					i += 1
 		return tile_dict
 
+	def check_coastal_subtile(self, subtile) -> bool:
+		border_direction = None
+		if subtile.subcoord[0] == 0 and subtile.subcoord[1] == 0:
+			border_direction = "northwest"
+		elif subtile.subcoord[0] == self.subtile_coord_max and subtile.subcoord[1] == 0:
+			border_direction = "northeast"
+		elif subtile.subcoord[0] == 0 and subtile.subcoord[1] == self.subtile_coord_max:
+			border_direction = "southwest"
+		elif subtile.subcoord[0] == self.subtile_coord_max and subtile.subcoord[1] == self.subtile_coord_max:
+			border_direction = "southeast"
+		elif subtile.subcoord[0] == 0:
+			border_direction = "west"
+		elif subtile.subcoord[0] == self.subtile_coord_max:
+			border_direction = "east"
+		elif subtile.subcoord[1] == 0:
+			border_direction = "north"
+		elif subtile.subcoord[1] == self.subtile_coord_max:
+			border_direction = "south"
+		else:
+			return False
+		tile = subtile.parent
+		neighbor_coords = self.neighbors((tile.xCord, tile.yCord))
+		ocean_neighbor_coords = [coord for coord in neighbor_coords if self.tile_dict[coord].tile_type == "ocean"]
+		if len(ocean_neighbor_coords) == 0:
+			return False
+		directions = [tuple(map(lambda x, y: x - y, coord, (tile.xCord, tile.yCord))) for coord in ocean_neighbor_coords]
+		dir_dict = {
+			"northwest": (-1,-1),
+			"north": (0, -1),
+			"northeast": (1,-1),
+			"west": (-1,0),
+			"east": (1,0),
+			"southwest": (-1,1),
+			"south": (0,1),
+			"southeast": (1,1)
+		}
+		if dir_dict.get(border_direction, "none") in directions:
+			return True
 
+	def get_subtile_neighbors(self, subtile) -> dict:
+		return self.subtile_edges[subtile.globalcoord]
 
+	def calc_desert_type(self, subtile) -> str:
+		"""Random number for now, should eventually use a groundwater noise generator"""
+		groundwater = random.randrange(30)
+		if groundwater >= 28:
+			return "oasis_desert"
+		if self.check_coastal_subtile(subtile):
+			return "coastal_desert"
+		if (subtile.elevation - self.map_config.sea_level) > 25:
+			return "badlands_desert"
+		else:
+			return "sandy_desert"
 
+	def calc_savannah_type(self, subtile) -> str:
+		groundwater = random.randrange(30)
+		if groundwater >= 28:
+			return "oasis_savannah"
+		sub_prec = subtile.parent.precipitation + random.randrange(-10, 10)
+		if sub_prec > 20:
+			return "woodlands_savannah"
+		if sub_prec > 10:
+			return "serengeti_savannah"
+		else:
+			return "dry_savannah"
 
+	def calc_tropical_rainforest_type(self, subtile) -> str:
+		if (subtile.elevation - self.map_config.sea_level) > 30:
+			return "cloud_rainforest"
+		sub_prec = subtile.parent.precipitation + random.randrange(-10, 10)
+		if sub_prec > 95:
+			return "swamp_rainforest"
+		else:
+			return "base_rainforest"
+
+	def calc_temperate_forest_type(self, subtile) -> str:
+		if self.check_coastal_subtile(subtile):
+			return "rainforest_temperate"
+		if (subtile.elevation - self.map_config.sea_level) > 30:
+			return "conifer_forest"
+		else:
+			return "deciduous_forest"
+
+	def calc_grassland_type(self, subtile) -> str:
+		if (subtile.elevation - self.map_config.sea_level) > 35:
+			return "moors_grassland"
+		sub_prec = subtile.parent.precipitation + random.randrange(-10, 10)
+		if sub_prec > 50:
+			return "meadow_grassland"
+		else:
+			return "prairie_grassland"
+
+	def calc_steppe_type(self, subtile) -> str:
+		neighboring_subtiles = [self.subtile_dict[coord] for coord in self.get_subtile_neighbors(subtile)]
+		print(len(neighboring_subtiles))
+		mean_el = statistics.mean([sub.elevation for sub in neighboring_subtiles])
+		if subtile.elevation > mean_el:
+			return "badlands_steppe"
+		else:
+			return "grasslands_steppe"
+
+	def calc_marsh_type(self, subtile) -> str:
+		if self.check_coastal_subtile(subtile):
+			return "salt_marsh"
+		if (subtile.parent.temperature + random.randrange(-10,10)) > 20:
+			return "grassy_marsh"
+		else:
+			return "swamp_marsh"
+
+	def calc_boreal_type(self, subtile) -> str:
+		if (subtile.elevation - self.map_config.sea_level) > 30:
+			return "spruce_forest"
+		else:
+			return "boreal_pine_forest"
+
+	def calc_tundra_type(self, subtile) -> str:
+		if subtile.parent.temperature < 10:
+			return "glacier"
+		if subtile.parent.precipitation < 10:
+			return "cold_desert_tundra"
+		else:
+			return "base_tundra"
+
+	def calc_mountain_type(self, subtile) -> str:
+		if subtile.elevation > 95:
+			return "glacier"
+		if subtile.parent.temperature > 20:
+			return "tropical_alpine"
+		else:
+			return "alpine"
+
+	def calc_ocean_type(self, subtile) -> str:
+		if (subtile.elevation - self.map_config.sea_level) > -10:
+			return "shelf_ocean"
+		if (subtile.elevation - self.map_config.sea_level) > -30:
+			return "ocean"
+		else:
+			return "trench"
+
+	switcher = {
+		"ocean": calc_ocean_type,
+		"mountain": calc_mountain_type,
+		"tundra": calc_tundra_type,
+		"boreal": calc_boreal_type,
+		"marsh": calc_marsh_type,
+		"steppe": calc_steppe_type,
+		"grassland": calc_grassland_type,
+		"desert": calc_desert_type,
+		"temperate_forest": calc_temperate_forest_type,
+		"savannah": calc_savannah_type,
+		"tropical_forest": calc_tropical_rainforest_type
+	}
+
+	def calculate_subtile_type(self, subtile) -> str:
+		"""Uses arguments to determine the subtile's type. Returns a type string"""
+		"""This uses a dictionary of lambdas. Each defined function is used depending on the climate type of the parent tile."""
+		return self.switcher.get(subtile.parent.tile_type, "Unassigned")(self, subtile)
 
 
 
@@ -269,20 +463,32 @@ if __name__ == "__main__":
 
 	settings_db = db.ConfigDB()
 	map_config = settings_db.get_script_config("test")
+
 	new_map = MapGraph(map_config)
 	database = db.MapDB()
 	type_list = texgen.tile_dict_to_type_lists(new_map.tile_dict, \
 		map_config.width, map_config.height)
+	# print(new_map.tile_dict)
 	color_list = list()
 	for row in type_list:
 		color_list.append(texgen.type_list_to_color_list(row))
 	# print(color_list)
-
+	new_map.check_coastal_subtile(new_map.subtile_dict[105, 29])
 	texgen.draw_terrain_map(color_list, "map.png", 50)
+	type_list = texgen.subtile_dict_to_type_lists(new_map.subtile_dict, map_config.width*new_map.subtile_coord_max, map_config.height*new_map.subtile_coord_max)
+	subtile_color_list = list()
+	for row in type_list:
+		subtile_color_list.append(texgen.subtile_type_list_to_color_list(row))
+	texgen.draw_terrain_map(subtile_color_list, "subtile.png", 10)
 	texgen.draw_height_map(new_map.tile_dict, "heightmap.png",map_config.width, map_config.height, 50)
 	texgen.create_physical_map("map.png", "heightmap.png", "phys_map.png")
 	for cord, tile in new_map.tile_dict.items():
 		database.add_tile(tile.tile_id, tile.xCord, tile.yCord, tile.elevation,\
 			tile.precipitation, tile.temperature, tile.tile_type, tile.tile_mv_cost)
+	for coord, subtile in new_map.subtile_dict.items():
+		database.add_subtile(subtile.id, subtile.globalcoord[0], subtile.globalcoord[1], subtile.elevation, subtile.subtile_type, subtile.mv_mod, subtile.parent.tile_id)
 	database.save_to_file("test.world.db")
+	database.close()
+	settings_db.close()
+
 
