@@ -86,7 +86,12 @@ class MapGraph:
 		self.subtile_coord_max = 4
 		self.noise_config = wrappednoise.NoiseConfig\
 		(mapconfig.octaves,mapconfig.freq,mapconfig.exp, \
-			mapconfig.persistence)
+			mapconfig.persistence, map_config.amp)
+		print(self.noise_config.oc)
+		print(self.noise_config.freq)
+		print(self.noise_config.exp)
+		print(self.noise_config.persistence)
+		print(self.noise_config.amplitude)
 		self.map_config = mapconfig
 		self.tile_dict = self.generate_tile_dict(self.map_config, \
 			self.noise_config)
@@ -116,7 +121,6 @@ class MapGraph:
 
 		for coord, tile in self.subtile_dict.items():
 			new_type = self.calculate_subtile_type(tile)
-			print(new_type)
 			tile.subtile_type = new_type
 
 		texgen.draw_mountain_map(self.tile_dict,\
@@ -222,7 +226,7 @@ class MapGraph:
 						distance_dict[neighbor] = new_distance
 						q.put(neighbor)
 
-		distance_scaling = 2.0 # This variable is used to scale the distances exponentially, 
+		distance_scaling = 3 # This variable is used to scale the distances exponentially, 
 								#increasing the weight of higher altitudes on the precipitation calculation
 		distance_cutoff_percent = 0.5 #This variable sets a limit for 0 precipitation 
 										#in terms of percentage of highest elevation on map
@@ -263,16 +267,17 @@ class MapGraph:
 		tile_dict = dict()
 		x = 0
 		y = 0
-		base_noise = noise.produce_noise_list_percent(mapconfig.width,\
+		noise_list = noise.produce_noise_list_percent(mapconfig.width,\
 		 mapconfig.height)
-		adjusted_noise = \
-		noise.transform_noise_list(base_noise, 40, statistics.pstdev(base_noise))
+
 		for i in range(0,mapconfig.width*mapconfig.height):
 			
 			if x >= mapconfig.width:
 				x = 0
 				y+=1
-			el = adjusted_noise[i]
+			el = noise_list[i]
+			if el < 0 or el > 100:
+				print("elevation out of bounds: " + str(el))
 			temperature = self.temperature_calc(y,el)
 			tile_dict[(x,y)] = MapTile(x,y,el,0,temperature, i, 0)
 			tile_dict[(x,y)].tile_mv_cost = settings.get_base_mv_cost(tile_dict[(x,y)].tile_type)
@@ -384,7 +389,7 @@ class MapGraph:
 
 	def calc_steppe_type(self, subtile) -> str:
 		neighboring_subtiles = [self.subtile_dict[coord] for coord in self.get_subtile_neighbors(subtile)]
-		print(len(neighboring_subtiles))
+		# print(len(neighboring_subtiles))
 		mean_el = statistics.mean([sub.elevation for sub in neighboring_subtiles])
 		if subtile.elevation > mean_el:
 			return "badlands_steppe"
@@ -475,7 +480,7 @@ if __name__ == "__main__":
 	# print(color_list)
 	new_map.check_coastal_subtile(new_map.subtile_dict[105, 29])
 	texgen.draw_terrain_map(color_list, "map.png", 50)
-	type_list = texgen.subtile_dict_to_type_lists(new_map.subtile_dict, map_config.width*new_map.subtile_coord_max, map_config.height*new_map.subtile_coord_max)
+	type_list = texgen.subtile_dict_to_type_lists(new_map.subtile_dict, map_config.width*(new_map.subtile_coord_max+1), map_config.height*(new_map.subtile_coord_max+1))
 	subtile_color_list = list()
 	for row in type_list:
 		subtile_color_list.append(texgen.subtile_type_list_to_color_list(row))

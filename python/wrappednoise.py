@@ -5,26 +5,24 @@ import statistics
 #Third Party
 from opensimplex import OpenSimplex
 
+#Local
+import helper
+
 
 class NoiseConfig:
-	oc: int #octaves
-	freq: float
-	exp: float #exponent
-	persistence: float
 
-	def __init__(self, o, f, e, p = 0.5):
+	def __init__(self, o, f, e, p = 0.5, amp = 1):
 		self.oc = o
 		self.freq = f
 		self.exp = e
 		self.persistence = p
+		self.amplitude = amp
 
 class WrappedNoise:
 	def __init__(self, config):
 		self.conf = config
 		self.noise = OpenSimplex(int(time.time()))
 
-	conf: NoiseConfig
-	noise: OpenSimplex
 
 	def noise_at_point(self,x,y):
 		x= x +1
@@ -47,6 +45,8 @@ class WrappedNoise:
 			flipper = -1
 		output = pow(output, self.conf.exp)
 		output *= flipper
+		output *= self.conf.amplitude
+		output = helper.linearConversion(output, self.conf.amplitude*-1, self.conf.amplitude, -1, 1)
 		return output
 
 	def transform_noise_list(self, input, new_mean, new_sd):
@@ -69,7 +69,9 @@ class WrappedNoise:
 			row = list()
 			for x in range(0,sizex):
 				percent = self.noise_at_point(x, y)
-				percent = noise_to_percent(percent)
+				if percent > 1 or percent < -1:
+					print("noise outside bounds")
+				percent = helper.linearConversion(percent, -1, 1, 0, 100)
 				results.append(percent)
 		return results
 
