@@ -23,7 +23,7 @@ class MapGraph:
 	def __init__(self, mapconfig):
 		self.tile_dict = dict()
 		self.subtile_dict = dict()
-		self.subtile_coord_max = 4
+		self.subtile_coord_max = mapconfig.subtiles - 1
 		# self.noise_config = wrappednoise.NoiseConfig\
 		# (mapconfig.octaves,mapconfig.freq,mapconfig.exp, \
 		# 	mapconfig.persistence, map_config.amp)
@@ -223,13 +223,14 @@ class MapGraph:
 		for coord, tile in tile_dict.items():
 			for y in range(0, 5):
 				for x in range(0,5):
-					i = coord[1] * (self.subtile_coord_max + 1)
+					i = coord[1] * (mapconfig.subtiles)
 					i += y
-					i *= coord[0] * (self.subtile_coord_max + 1)
+					i *= coord[0] * (mapconfig.subtiles)
 					i += x
 					new_subtile = mapsubtile.MapSubTile(subtile_elevation_list[i], tile, x, y, id)
 					self.subtile_dict[new_subtile.globalcoord] = new_subtile
 					id += 1
+		settings.close()
 		return tile_dict
 
 	def check_coastal_subtile(self, subtile) -> bool:

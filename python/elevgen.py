@@ -7,7 +7,7 @@ import wrappednoise
 import helper
 
 def generate_elevation_list(mapconfig, subtileratio) -> list:
-	noise_config = wrappednoise.NoiseConfig(mapconfig.octaves, mapconfig.freq, mapconfig.exp, mapconfig.persistence, mapconfig.amp)
+	noise_config = wrappednoise.NoiseConfig(8, 0.01, 0.5, 0.5, 1)
 	noise = wrappednoise.WrappedNoise(noise_config)
 	# noise.conf.freq *= (1/subtileratio) #This should convert this to a subtile elevation list, which can then be averaged if needed for a tile elevation list
 	output = list()
@@ -32,6 +32,8 @@ def generate_tile_elevation_list(subtile_elevations, subtileratio) -> list:
 		i += subtileratio
 
 	return output
+
+
 
 
 
