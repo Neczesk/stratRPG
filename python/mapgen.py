@@ -7,75 +7,15 @@ import decimal
 import random
 
 #Local Imports
-import wrappednoise
 import db
 import helper
 import texgen
+import maptile
+import mapsubtile
+import elevgen
 
-class MapTile:
-	"""This class represents a slightly larger region of the map, with a single climate."""
-	def __init__(self, x, y, e, p, t, id, mv_cost):
-		self.xCord = x
-		self.yCord = y
-		self.elevation = e
-		self.precipitation = p
-		self.temperature = t
-		self.tile_id = id
-		self.tile_mv_cost = mv_cost
-		self.tile_type = "Unassigned"
 
-	def calculate_type(self, settings) -> str:
-		if self.elevation > settings.mountain_level:
-			return "mountain"
-		if self.elevation < settings.sea_level:
-			return "ocean"
-		if self.temperature <= 30:
-			if self.precipitation <= 30:
-				tile_type = "tundra"
-			if self.precipitation > 30 and self.precipitation <= 70:
-				tile_type = "boreal"
-			if self.precipitation > 70:
-				tile_type = "marsh"
-		elif self.temperature > 30 and self.temperature <= 70:
-			if self.precipitation <= 30:
-				tile_type = "steppe"
-			elif self.precipitation > 30 and self.precipitation <= 70:
-				tile_type = "grassland"
-			elif self.precipitation > 70:
-				tile_type = "temperate_forest"
-		elif self.temperature > 70:
-			if self.precipitation <= 30:
-				tile_type = "desert"
-			elif self.precipitation > 30 and self.precipitation <= 70:
-				tile_type = "savannah"
-			elif self.precipitation > 70:
-				tile_type = "tropical_forest"
-		else:
-			print("error determining tile type")
-			print(self.temperature)
-			print(self.precipitation)
 
-		# if self.precipitation == 0:
-		# 	tile_type = "test_no_prec"
-
-		return tile_type
-
-	def change_type(self, new_type):
-		self.tile_type = new_type
-		settings = db.ConfigDB()
-		self.mv_cost = settings.get_base_mv_cost(new_type)
-		settings.close()
-
-class MapSubTile:
-	"""This class represents the smallest, indivisible points on the map. Entities can move through these subtiles and structures can exist on them."""
-	def __init__(self, noise, tile, x, y, id):
-		self.subcoord = (x,y)
-		self.globalcoord = ((tile.xCord*5 + x), (tile.yCord*5 + y))
-		self.elevation = noise.noise_at_point(float(self.globalcoord[0]), float(self.globalcoord[1]))
-		self.subtile_type = "Unassigned"
-		self.parent = tile
-		self.id = id
-		self.mv_mod = 0
 
 class MapGraph:
 
@@ -84,17 +24,11 @@ class MapGraph:
 		self.tile_dict = dict()
 		self.subtile_dict = dict()
 		self.subtile_coord_max = 4
-		self.noise_config = wrappednoise.NoiseConfig\
-		(mapconfig.octaves,mapconfig.freq,mapconfig.exp, \
-			mapconfig.persistence, map_config.amp)
-		print(self.noise_config.oc)
-		print(self.noise_config.freq)
-		print(self.noise_config.exp)
-		print(self.noise_config.persistence)
-		print(self.noise_config.amplitude)
+		# self.noise_config = wrappednoise.NoiseConfig\
+		# (mapconfig.octaves,mapconfig.freq,mapconfig.exp, \
+		# 	mapconfig.persistence, map_config.amp)
 		self.map_config = mapconfig
-		self.tile_dict = self.generate_tile_dict(self.map_config, \
-			self.noise_config)
+		self.tile_dict = self.generate_tile_dict(self.map_config)
 
 		self.edges: Dict[tuple, list[tuple]] = {}
 		self.generate_edges()
@@ -107,8 +41,8 @@ class MapGraph:
 		for tile in self.tile_dict:
 			self.tile_dict[tile].precipitation = prec_dict[tile]
 
-		self.noise_modify_prec()
-		self.noise_modify_temp()
+		# self.noise_modify_prec()
+		# self.noise_modify_temp()
 
 		for coord, tile in self.tile_dict.items():
 			if tile.tile_type == None:
@@ -151,32 +85,32 @@ class MapGraph:
 						self.subtile_edges[coord].append((coord[0]+x, \
 								coord[1]+y))
 
-	def noise_modify_prec(self):
-		prec_noise_config = wrappednoise.NoiseConfig\
-		(map_config.prec_octaves, map_config.prec_freq, 1, \
-			map_config.prec_persistence)
-		prec_noise = wrappednoise.WrappedNoise(prec_noise_config)
-		texgen.noise_visualize(prec_noise, self.map_config.width, self.map_config.height, 50, "prec_noise.png")
+	# def noise_modify_prec(self):
+	# 	prec_noise_config = wrappednoise.NoiseConfig\
+	# 	(map_config.prec_octaves, map_config.prec_freq, 1, \
+	# 		map_config.prec_persistence)
+	# 	prec_noise = wrappednoise.WrappedNoise(prec_noise_config)
+	# 	texgen.noise_visualize(prec_noise, self.map_config.width, self.map_config.height, 50, "prec_noise.png")
 
-		for coord, tile in self.tile_dict.items():
-			prec_mod = prec_noise.noise_at_point(coord[0], coord[1])
-			prec_mod = helper.linearConversion(prec_mod, -1, 1, -30, 30)
-			tile.precipitation += prec_mod
-			tile.precipitation = helper.clamp(tile.precipitation, 0, 100)
+	# 	for coord, tile in self.tile_dict.items():
+	# 		prec_mod = prec_noise.noise_at_point(coord[0], coord[1])
+	# 		prec_mod = helper.linearConversion(prec_mod, -1, 1, -30, 30)
+	# 		tile.precipitation += prec_mod
+	# 		tile.precipitation = helper.clamp(tile.precipitation, 0, 100)
 
-	def noise_modify_temp(self):
-		temp_noise_config = wrappednoise.NoiseConfig\
-		(map_config.temp_octaves, map_config.temp_freq, 1,\
-			map_config.temp_persistence)
-		temp_noise = wrappednoise.WrappedNoise(temp_noise_config)
+	# def noise_modify_temp(self):
+	# 	temp_noise_config = wrappednoise.NoiseConfig\
+	# 	(map_config.temp_octaves, map_config.temp_freq, 1,\
+	# 		map_config.temp_persistence)
+	# 	temp_noise = wrappednoise.WrappedNoise(temp_noise_config)
 
-		for coord, tile in self.tile_dict.items():
-			temp_mod = temp_noise.noise_at_point(coord[0], coord[1])
-			temp_mod = helper.linearConversion(temp_mod, -1, 1, -30, 30)
-			if abs(temp_mod) > 30:
-				print("abs temp mod exceeds 30")
-			tile.temperature += temp_mod
-			tile.temperature = helper.clamp(tile.temperature, 0, 100)
+	# 	for coord, tile in self.tile_dict.items():
+	# 		temp_mod = temp_noise.noise_at_point(coord[0], coord[1])
+	# 		temp_mod = helper.linearConversion(temp_mod, -1, 1, -30, 30)
+	# 		if abs(temp_mod) > 30:
+	# 			print("abs temp mod exceeds 30")
+	# 		tile.temperature += temp_mod
+	# 		tile.temperature = helper.clamp(tile.temperature, 0, 100)
 
 
 
@@ -261,25 +195,24 @@ class MapGraph:
 
 
 
-	def generate_tile_dict(self, mapconfig, noiseConfig) -> dict:
+	def generate_tile_dict(self, mapconfig) -> dict:
 		settings = db.ConfigDB()
-		noise = wrappednoise.WrappedNoise(noiseConfig)
 		tile_dict = dict()
 		x = 0
 		y = 0
-		noise_list = noise.produce_noise_list_percent(mapconfig.width,\
-		 mapconfig.height)
+		subtile_elevation_list = elevgen.generate_elevation_list(mapconfig, self.subtile_coord_max+1)
+		elevation_list = elevgen.generate_tile_elevation_list(subtile_elevation_list, self.subtile_coord_max+1)
 
 		for i in range(0,mapconfig.width*mapconfig.height):
 			
 			if x >= mapconfig.width:
 				x = 0
 				y+=1
-			el = noise_list[i]
+			el = elevation_list[i]
 			if el < 0 or el > 100:
 				print("elevation out of bounds: " + str(el))
 			temperature = self.temperature_calc(y,el)
-			tile_dict[(x,y)] = MapTile(x,y,el,0,temperature, i, 0)
+			tile_dict[(x,y)] = maptile.MapTile(x,y,el,0,temperature, i, 0)
 			tile_dict[(x,y)].tile_mv_cost = settings.get_base_mv_cost(tile_dict[(x,y)].tile_type)
 			if el <= mapconfig.sea_level:
 				tile_dict[(x,y)].tile_type = "ocean"
@@ -290,9 +223,13 @@ class MapGraph:
 		for coord, tile in tile_dict.items():
 			for y in range(0, 5):
 				for x in range(0,5):
-					new_subtile = MapSubTile(noise, tile, x, y, i)
+					i = coord[1] * (self.subtile_coord_max + 1)
+					i += y
+					i *= coord[0] * (self.subtile_coord_max + 1)
+					i += x
+					new_subtile = mapsubtile.MapSubTile(subtile_elevation_list[i], tile, x, y, id)
 					self.subtile_dict[new_subtile.globalcoord] = new_subtile
-					i += 1
+					id += 1
 		return tile_dict
 
 	def check_coastal_subtile(self, subtile) -> bool:
