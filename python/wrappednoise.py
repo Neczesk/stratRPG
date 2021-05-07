@@ -46,8 +46,8 @@ class WrappedNoise:
 		output = pow(output, self.conf.exp)
 		output *= flipper
 		output *= self.conf.amplitude
-		output = helper.linearConversion(output, self.conf.amplitude*-1, self.conf.amplitude, -1, 1)
 		return output
+
 
 	def transform_noise_list(self, input, new_mean, new_sd):
 		"""Calculates mean and standard deviation of the list given, then 

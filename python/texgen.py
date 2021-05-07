@@ -82,6 +82,16 @@ def draw_height_map(tile_dict, path, width, height, scale):
 				((coord[0]+1)*scale, (coord[1]+1)*scale)], ImageColor.getrgb("hsv(0,0%,"+str(value)+"%)"))
 		im.save(path, "PNG")
 
+def draw_elevation_map(el_dict, path, width, height, scale):
+	with Image.new("L", (width*scale, height*scale)) as im:
+		draw = ImageDraw.Draw(im)
+		for y in range(0, height):
+			for x in range(0, width):
+				value = el_dict[(x,y)]
+
+				draw.rectangle([(x*scale, y*scale), ((x+1)*scale, (y+1)*scale)], value)
+		im.save(path, "PNG")
+
 def create_physical_map(terrain_map_path, height_map_path, path):
 	with Image.open(terrain_map_path) as terrain_map:
 		with Image.open(height_map_path) as height_map:
