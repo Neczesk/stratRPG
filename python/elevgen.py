@@ -100,15 +100,68 @@ class continent:
 				q.put(helper.add_coordinates(current, (0, -1)))
 
 class MountainRange:
-	def __init__(self, subtiles):
-		self.subtiles = subtiles
-		# print("finding center")
+	def __init__(self, anchors):
+		self.anchors = list(anchors)
+		self.mainline = self.set_mainline(self.anchors)
+		self.highlands = self.set_highlands(2)
+		self.foothills = self.set_foothills(6)
+		self.subtiles = self.set_subtiles()
 		self.center = self.find_center()
-		# print("finding boundaries")
 		self.boundary = self.find_boundary()
-		# print("generating quadrants")
-		self.quadrants = self.create_quadrants()
-		self.anchors = set()
+		# self.quadrants = self.create_quadrants()
+
+	def set_highlands(self, generations) -> set:
+		output = set()
+		q = queue.Queue()
+		for point in self.mainline:
+			q.put(point)
+		for i in range(generations):
+			new_tiles = set()
+			while not q.empty():
+				tile = q.get()
+				for mod in [(0,1),(1,0),(-1,0),(0,-1),(1,1),(-1,-1),(-1,1),(1,-1)]:
+					current = helper.add_coordinates(tile, mod)
+					if current not in self.mainline:
+						new_tiles.add(current)
+			output.update(new_tiles)
+			for point in new_tiles:
+				q.put(point)
+
+		return output
+
+	def set_foothills(self, generations) -> set:
+		output = set()
+		q = queue.Queue()
+		for point in self.highlands:
+			q.put(point)
+		for i in range(generations):
+			new_tiles = set()
+			while not q.empty():
+				tile = q.get()
+				for mod in [(0,1),(1,0),(-1,0),(0,-1)]:
+					current = helper.add_coordinates(tile, mod)
+					if current not in self.mainline and current not in self.highlands:
+						new_tiles.add(current)
+			output.update(new_tiles)
+			for point in new_tiles:
+				q.put(point)
+
+		return output
+
+	def set_subtiles(self) -> set:
+		return self.mainline.union(self.highlands, self.foothills)
+
+	def set_mainline(self, anchors) -> set:
+		output = set()
+		for i in range(0, len(anchors)):
+			if (i+1) >= len(anchors):
+				break
+			else:
+				new_line = helper.get_line_points(anchors[i], anchors[i+1])
+				for point in new_line:
+					output.add(point)
+		return output
+
 
 	def find_center(self) -> tuple:
 		sumx = 0
@@ -183,20 +236,24 @@ def generate_new_subtile_elevation_dict(mapconfig) -> dict:
 		other_continents.remove(continent)
 		for cont in other_continents:
 			if len(continent.all_subtiles.intersection(cont.all_subtiles)) > 0:
-				new_mountains_subtiles = continent.all_subtiles.intersection(cont.all_subtiles)
-				new_mountain_range = MountainRange(new_mountains_subtiles)
-				# print(len(continent.boundary.intersection(cont.boundary)))
 				if len(continent.boundary.intersection(cont.boundary)) >= 2:
 					distance = helper.longest_distance_between_points(continent.boundary.intersection(cont.boundary))
-					new_mountain_range.set_anchors(distance[1], distance[2])
-				valid = True
-				for m in mountain_ranges:
-					if m.is_same_mountain_range(new_mountain_range):
-						valid = False
-				if valid:
-					mountain_ranges.append(new_mountain_range)
-					new_elevations = raise_mountain_range(new_mountain_range, 255)
-					output.update(new_elevations)
+					anchors = list(distance[1:])
+					print(anchors)
+					new_mountain_range = MountainRange(anchors)
+					valid = True
+					for m in mountain_ranges:
+						if m.is_same_mountain_range(new_mountain_range):
+							valid = False
+					if valid:
+						mountain_ranges.append(new_mountain_range)
+						new_elevations = raise_mountain_range(new_mountain_range, 255)
+						output.update(new_elevations)
+	for subtile in output:
+		if output[subtile] < 0:
+			output[subtile] = 0
+		elif output[subtile] > 255:
+			output[subtile] = 255
 	return output
 
 def raise_continent_to_elevation(continent, elevation) -> dict:
