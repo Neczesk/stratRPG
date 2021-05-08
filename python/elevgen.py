@@ -185,21 +185,10 @@ def generate_new_subtile_elevation_dict(mapconfig) -> dict:
 			if len(continent.all_subtiles.intersection(cont.all_subtiles)) > 0:
 				new_mountains_subtiles = continent.all_subtiles.intersection(cont.all_subtiles)
 				new_mountain_range = MountainRange(new_mountains_subtiles)
-				print(len(continent.boundary.intersection(cont.boundary)))
+				# print(len(continent.boundary.intersection(cont.boundary)))
 				if len(continent.boundary.intersection(cont.boundary)) >= 2:
-					all_points = continent.boundary.intersection(cont.boundary)
-					max_distance = 0
-					point1 = (0,0)
-					point2 = (0,0)
-					for pointa in all_points:
-						other_points = all_points.difference(pointa)
-						for pointb in other_points:
-							distance = math.sqrt(math.pow(pointb[0]-pointa[0],2) + math.pow(pointb[1] - pointa[1], 2))
-							if distance > max_distance:
-								max_distance = distance
-								point1 = pointa
-								point2 = pointb
-					new_mountain_range.set_anchors(point1, point2)
+					distance = helper.longest_distance_between_points(continent.boundary.intersection(cont.boundary))
+					new_mountain_range.set_anchors(distance[1], distance[2])
 				valid = True
 				for m in mountain_ranges:
 					if m.is_same_mountain_range(new_mountain_range):
@@ -223,20 +212,14 @@ def raise_continent_to_elevation(continent, elevation) -> dict:
 def raise_mountain_range(mountain_range, elevation) -> dict:
 	output = dict()
 	mainline = set()
-	startpoint = random.choice(tuple(mountain_range.boundary))
-	startquad = mountain_range.quadrants[startpoint]
-	endquad = (startquad + 2) % 4 #Should return the opposite quadrant based on the standard cartesian quadrants
-	if endquad == 0:
-		endquad = 4
-	# print(startquad)
-	# print(endquad)
-	# print("finding possible endpoints")
-	# print(mountain_range.quadrants)
-	possible_endpoints = [point for point in mountain_range.quadrants if mountain_range.quadrants[point] == endquad]
-	# print(possible_endpoints)
-	endpoint = random.choice(possible_endpoints)
-	mainline = helper.get_line_points(startpoint, mountain_range.center)
-	mainline = mainline.union(helper.get_line_points(mountain_range.center, endpoint))
+	if len(mountain_range.anchors) == 2:
+		anchor_tuple = tuple(mountain_range.anchors)
+		startpoint = anchor_tuple[0]
+		endpoint = anchor_tuple[1]
+		for point in helper.get_line_points(startpoint, mountain_range.center):
+			mainline.add(point)
+		for point in helper.get_line_points(mountain_range.center, endpoint):
+			mainline.add(point)
 
 	for subtile in mountain_range.subtiles:
 		output[subtile] = 150

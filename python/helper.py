@@ -117,7 +117,20 @@ def get_line_points(start, destination) -> set:
 def subtile_to_tile(subtile, subtileratio) -> tuple:
 	return (math.floor(subtile[0]/subtileratio), math.floor(subtile[1]/subtileratio))
 
-	
+def longest_distance_between_points(all_points) -> tuple:
+	max_distance = 0
+	point1 = (0,0)
+	point2 = (0,0)
+	for pointa in all_points:
+		other_points = all_points.difference(pointa)
+		for pointb in other_points:
+			distance = math.sqrt(math.pow(pointb[0]-pointa[0],2) + math.pow(pointb[1] - pointa[1], 2))
+			if distance > max_distance:
+				max_distance = distance
+				point1 = pointa
+				point2 = pointb
+	return (max_distance, point1, point2)
 
 if __name__ == "__main__":
 	print(get_ellipse_points((0,0), 20, 50))
+
