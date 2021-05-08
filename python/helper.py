@@ -79,6 +79,44 @@ def get_ellipse_points(origin, sizex, sizey) -> set:
 
 	return output
 
+def get_line_points(start, destination) -> set:
+	output = set()
+	dx = abs(destination[0] - start[0])
+	dy = abs(destination[1] - start[1])
+	# print("started drawing line")
+
+	x = start[0]
+	y = start[1]
+
+	sx = -1 if start[0] > destination[0] else 1
+	sy = -1 if start[1] > destination[1] else 1
+
+	if dx > dy:
+		err = dx / 2.0
+		while x != destination[0]:
+			output.add((x,y))
+			# print((x,y))
+			err -= dy
+			if err < 0:
+				y += sy
+				err += dx
+			x += sx
+	else:
+		err = dy / 2.0
+		while y != destination[1]:
+			output.add((x,y))
+			# print((x,y))
+			err -= dx
+			if err < 0:
+				x += sx
+				err += dy
+			y += sy
+	output.add((x,y))
+	return output
+
+def subtile_to_tile(subtile, subtileratio) -> tuple:
+	return (math.floor(subtile[0]/subtileratio), math.floor(subtile[1]/subtileratio))
+
 	
 
 if __name__ == "__main__":
