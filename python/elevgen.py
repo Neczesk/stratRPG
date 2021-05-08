@@ -9,6 +9,7 @@ import wrappednoise
 import helper
 import db
 import texgen
+import geometry
 
 def generate_elevation_list(mapconfig, subtileratio) -> list:
 	noise_config = wrappednoise.NoiseConfig(8, 0.01, 0.5, 0.5, 1)
@@ -85,19 +86,19 @@ class continent:
 		#Basic flood fill algorithm
 		q = queue.Queue()
 		start = self.origin
-		q.put(helper.add_coordinates(start, (0,1)))
-		q.put(helper.add_coordinates(start, (1,0)))
-		q.put(helper.add_coordinates(start, (-1, 0)))
-		q.put(helper.add_coordinates(start, (0, -1)))
+		q.put(geometry.add_coordinates(start, (0,1)))
+		q.put(geometry.add_coordinates(start, (1,0)))
+		q.put(geometry.add_coordinates(start, (-1, 0)))
+		q.put(geometry.add_coordinates(start, (0, -1)))
 
 		while not q.empty():
 			current = q.get()
 			if current not in self.all_subtiles:
 				self.add_subtile(current)
-				q.put(helper.add_coordinates(current, (0,1)))
-				q.put(helper.add_coordinates(current, (1,0)))
-				q.put(helper.add_coordinates(current, (-1, 0)))
-				q.put(helper.add_coordinates(current, (0, -1)))
+				q.put(geometry.add_coordinates(current, (0,1)))
+				q.put(geometry.add_coordinates(current, (1,0)))
+				q.put(geometry.add_coordinates(current, (-1, 0)))
+				q.put(geometry.add_coordinates(current, (0, -1)))
 
 class MountainRange:
 	def __init__(self, anchors):
@@ -120,7 +121,7 @@ class MountainRange:
 			while not q.empty():
 				tile = q.get()
 				for mod in [(0,1),(1,0),(-1,0),(0,-1),(1,1),(-1,-1),(-1,1),(1,-1)]:
-					current = helper.add_coordinates(tile, mod)
+					current = geometry.add_coordinates(tile, mod)
 					if current not in self.mainline:
 						new_tiles.add(current)
 			output.update(new_tiles)
@@ -139,7 +140,7 @@ class MountainRange:
 			while not q.empty():
 				tile = q.get()
 				for mod in [(0,1),(1,0),(-1,0),(0,-1)]:
-					current = helper.add_coordinates(tile, mod)
+					current = geometry.add_coordinates(tile, mod)
 					if current not in self.mainline and current not in self.highlands:
 						new_tiles.add(current)
 			output.update(new_tiles)
@@ -157,7 +158,7 @@ class MountainRange:
 			if (i+1) >= len(anchors):
 				break
 			else:
-				new_line = helper.get_line_points(anchors[i], anchors[i+1])
+				new_line = geometry.get_line_points(anchors[i], anchors[i+1])
 				for point in new_line:
 					output.add(point)
 		return output
@@ -179,7 +180,7 @@ class MountainRange:
 				for x in range(-1,2):
 					if x == 0 and y == 0:
 						continue
-					if helper.add_coordinates(subtile, (x,y)) not in self.subtiles:
+					if geometry.add_coordinates(subtile, (x,y)) not in self.subtiles:
 						boundary = True
 			if boundary:
 				output.add(subtile)
@@ -228,27 +229,38 @@ def generate_new_subtile_elevation_dict(mapconfig) -> dict:
 			 random.randrange(0, mapconfig.height *mapconfig.subtiles)), \
 			random.randrange(25,75), random.randrange(25,75)))
 		continents[i].all_tiles = continents[i].subtiles_to_tiles(mapconfig.subtiles)
-		new_elevations = raise_continent_to_elevation(continents[i], 128)
+		new_elevations = raise_continent_to_elevation(continents[i], 70)
 		output.update(new_elevations)
 	mountain_ranges = list()
 	for continent in continents:
-		other_continents = continents
-		other_continents.remove(continent)
-		for cont in other_continents:
-			if len(continent.all_subtiles.intersection(cont.all_subtiles)) > 0:
-				if len(continent.boundary.intersection(cont.boundary)) >= 2:
-					distance = helper.longest_distance_between_points(continent.boundary.intersection(cont.boundary))
-					anchors = list(distance[1:])
-					print(anchors)
-					new_mountain_range = MountainRange(anchors)
-					valid = True
-					for m in mountain_ranges:
-						if m.is_same_mountain_range(new_mountain_range):
-							valid = False
-					if valid:
-						mountain_ranges.append(new_mountain_range)
-						new_elevations = raise_mountain_range(new_mountain_range, 255)
-						output.update(new_elevations)
+		subtile_list = list(continent.all_subtiles)
+		for i in range(mapconfig.num_mnts_per_continent):
+			num_anchors = random.randrange(2,6)
+			min_spacing = int(500/num_anchors)
+			max_spacing = int(2000/num_anchors)
+			#TODO Add this number to config/template
+			anchors = list()
+			for n in range(num_anchors):
+				if n == 0:
+					anchors.append(random.choice(subtile_list))
+					continue
+				else:
+					possibles = list()
+					for y in range(-max_spacing, max_spacing):
+						for x in range(-max_spacing, max_spacing):
+							print(x,y)
+							if geometry.distance_between_two_points(anchors[n-1], geometry.add_coordinates(anchors[n-1], (x,y))) > min_spacing:
+								possibles.append(geometry.add_coordinates(anchors[n-1], (x,y)))
+					new_anchor = random.choice(possibles)
+
+					anchors.append(new_anchor)
+			new_mountain_range = MountainRange(anchors)
+			mountain_ranges.append(new_mountain_range)
+
+	for mountain_range in mountain_ranges:
+		raise_mountain_range(mountain_range)
+
+
 	for subtile in output:
 		if output[subtile] < 0:
 			output[subtile] = 0
@@ -261,38 +273,30 @@ def raise_continent_to_elevation(continent, elevation) -> dict:
 	for subtile in continent.all_subtiles:
 		output[subtile] = elevation
 	for subtile in continent.boundary:
-		output[subtile] = 100
+		output[subtile] = 50
 	# print(len(output))
 	# print(output)
 	return output
 
-def raise_mountain_range(mountain_range, elevation) -> dict:
+def raise_mountain_range(mountain_range) -> dict:
 	output = dict()
-	mainline = set()
-	if len(mountain_range.anchors) == 2:
-		anchor_tuple = tuple(mountain_range.anchors)
-		startpoint = anchor_tuple[0]
-		endpoint = anchor_tuple[1]
-		for point in helper.get_line_points(startpoint, mountain_range.center):
-			mainline.add(point)
-		for point in helper.get_line_points(mountain_range.center, endpoint):
-			mainline.add(point)
-
-	for subtile in mountain_range.subtiles:
-		output[subtile] = 150
-	for subtile in mountain_range.boundary:
-		output[subtile] = 50
-	for subtile in mainline:
-		output[subtile] = 200
-	for subtile in mountain_range.anchors:
-		output[subtile] = 255
+	for point in mountain_range.foothills:
+		output[point] = 100
+	for point in mountain_range.highlands:
+		output[point] = 128
+	for point in mountain_range.mainline:
+		output[point] = 180
+	for point in mountain_range.boundary:
+		output[point] = 220
+	for point in mountain_range.anchors:
+		output[point] = 255
 	return output
 
 def create_continent(origin, sizex, sizey):
 	new_continent = continent(origin)
 	new_continent.origin = origin
 	current = origin
-	continent_outline = helper.get_ellipse_points(origin, sizex, sizey)
+	continent_outline = geometry.get_ellipse_points(origin, sizex, sizey)
 	for point in continent_outline:
 		new_continent.add_subtile(point)
 		new_continent.boundary.add(point)
