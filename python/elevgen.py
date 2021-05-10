@@ -39,69 +39,87 @@ def generate_tile_elevation_list(subtile_elevations, subtileratio) -> list:
 	return output
 
 
-class continent:
-	def __init__(self, origin):
-		self.all_tiles = set()
-		self.origin = origin
-		self.all_tiles.add(origin)
-		self.all_subtiles = set()
+class MapFeature:
+	def __init__(self):
+		self.subtiles = set()
 		self.boundary = set()
+		self.center = (-1,-1)
 
-	def add_tile(self, new_tile):
-		self.all_tiles.add(new_tile)
+	def find_center(self) -> tuple:
+		sumx = 0
+		sumy = 0
+		for point in self.subtiles:
+			sumx += point[0]
+			sumy += point[1]
+		return (round(sumx/len(self.subtiles)), round(sumy/len(self.subtiles)))
 
 	def add_subtile(self, new_subtile):
 		self.all_subtiles.add(new_subtile)
 
-	def subtiles_to_tiles(self, subtileratio) -> set:
-		tiles = set()
-		for subtile in self.all_subtiles:
-			new_tile = helper.subtile_to_tile(subtile, subtileratio)
-			tiles.add(new_tile)
+	def find_boundary(self) -> set:
+		output = set()
+		for subtile in self.subtiles:
+			boundary = False
+			for y in range(-1,2):
+				for x in range(-1,2):
+					if x == 0 and y == 0:
+						continue
+					if geometry.add_coordinates(subtile, (x,y)) not in self.subtiles:
+						boundary = True
+			if boundary:
+				output.add(subtile)
 
-	def tiles_to_subtiles(self, subtileratio) -> set:
-		subtiles = set()
-		for tile in self.all_tiles:
-			for y in range(subtileratio):
-				for x in range(subtileratio):
-					subtile = ((tile[0]*subtileratio + x),(tile[1]*subtileratio + y))
-					subtiles.add(subtile)
-		# print(len(self.all_tiles))
-		# print(len(subtiles))
-		# print(self.all_tiles)
-		return subtiles
+		return output
 
-	def grow_continent(self, generations):
-		for i in range(generations):
-			new_tiles = set()
-			for tile in self.all_tiles:
-				for y in range(-1,2):
-					for x in range(-1,2):
-					# print("Checking: " + str(x) + ", " + str(y))
-						if (tile[0]+x, tile[1]+y) != tile:
-							new_tiles.add((tile[0]+x, tile[1]+y))
-			self.all_tiles.update(new_tiles)
+	def fill_to_boundary(self) -> set:
+		return geometry.get_points_inside_shape(self.boundary, self.center)
 
-	def fill_continent(self):
-		#Basic flood fill algorithm
-		q = queue.Queue()
-		start = self.origin
-		q.put(geometry.add_coordinates(start, (0,1)))
-		q.put(geometry.add_coordinates(start, (1,0)))
-		q.put(geometry.add_coordinates(start, (-1, 0)))
-		q.put(geometry.add_coordinates(start, (0, -1)))
+	def rotate(self, angle):
+		self.boundary = set()
+		self.subtiles = geometry.rotate_shape(self.subtiles, angle)
+		overlooked = set()
+		for point in self.subtiles:
+			for mod in [(0,1),(1,0),(1,1),(-1,-1),(-1,0),(0,-1),(-1,1),(1,-1)]:
+				current = geometry.add_coordinates(point, mod)
+				if current not in self.subtiles:
+					num_neighbors = 0
+					for mod2 in [(0,1),(1,0),(1,1),(-1,-1),(-1,0),(0,-1),(-1,1),(1,-1)]:
+						if geometry.add_coordinates(current, mod2) in self.subtiles:
+							num_neighbors += 1
+					if num_neighbors >= 4:
+						overlooked.add(current)
+		self.subtiles.update(overlooked)
 
-		while not q.empty():
-			current = q.get()
-			if current not in self.all_subtiles:
-				self.add_subtile(current)
-				q.put(geometry.add_coordinates(current, (0,1)))
-				q.put(geometry.add_coordinates(current, (1,0)))
-				q.put(geometry.add_coordinates(current, (-1, 0)))
-				q.put(geometry.add_coordinates(current, (0, -1)))
+		self.boundary = self.find_boundary()
 
-class MountainRange:
+
+
+
+
+class Continent(MapFeature):
+	def __init__(self, boundary):
+		super().__init__()
+		self.boundary = boundary
+		self.subtiles.update(boundary)
+		self.center = self.find_center()
+		self.subtiles.update(self.fill_to_boundary())
+
+	def combine_continents(self, continent2):
+		new_subtiles = self.subtiles.union(continent2.subtiles)
+		temp = MapFeature()
+		temp.subtiles = new_subtiles
+		temp.boundary = temp.find_boundary()
+		return Continent(temp.boundary)
+
+
+
+
+
+
+
+class MountainRange(MapFeature):
 	def __init__(self, anchors):
+		super().__init__()
 		self.anchors = list(anchors)
 		self.mainline = self.set_mainline(self.anchors)
 		self.highlands = self.set_highlands(2)
@@ -164,28 +182,6 @@ class MountainRange:
 		return output
 
 
-	def find_center(self) -> tuple:
-		sumx = 0
-		sumy = 0
-		for point in self.subtiles:
-			sumx += point[0]
-			sumy += point[1]
-		return (round(sumx/len(self.subtiles)), round(sumy/len(self.subtiles)))
-
-	def find_boundary(self) -> set:
-		output = set()
-		for subtile in self.subtiles:
-			boundary = False
-			for y in range(-1,2):
-				for x in range(-1,2):
-					if x == 0 and y == 0:
-						continue
-					if geometry.add_coordinates(subtile, (x,y)) not in self.subtiles:
-						boundary = True
-			if boundary:
-				output.add(subtile)
-
-		return output
 
 	def is_same_mountain_range(self, mountain_range):
 		if len(self.subtiles.difference(mountain_range.subtiles)) == 0:
@@ -221,45 +217,44 @@ def generate_new_subtile_elevation_dict(mapconfig) -> dict:
 	output = dict()
 	for y in range(mapconfig.height*mapconfig.subtiles):
 		for x in range(mapconfig.width * mapconfig.subtiles):
-			output[(x,y)] = 0
+			output[(x,y)] = 50
 	continents = list()
 	for i in range(mapconfig.num_continents):
-		continents.append(create_continent(\
-			(random.randrange(0, mapconfig.width * mapconfig.subtiles),\
-			 random.randrange(0, mapconfig.height *mapconfig.subtiles)), \
-			random.randrange(25,75), random.randrange(25,75)))
-		continents[i].all_tiles = continents[i].subtiles_to_tiles(mapconfig.subtiles)
+		# new_ellipse = geometry.get_ellipse_points((random.randrange(0, mapconfig.width*mapconfig.subtiles), random.randrange(0, mapconfig.height*mapconfig.subtiles)), random.randrange(25,75), random.randrange(25,75))
+		# # new_ellipse = geometry.rotate_shape(new_ellipse, random.randrange(360))
+		# new_continent = Continent(new_ellipse)
+		# new_continent.rotate(random.randrange(360))
+		continents.append(build_continent(3, mapconfig.width*mapconfig.subtiles, mapconfig.height*mapconfig.subtiles))
 		new_elevations = raise_continent_to_elevation(continents[i], 70)
 		output.update(new_elevations)
 	mountain_ranges = list()
 	for continent in continents:
-		subtile_list = list(continent.all_subtiles)
-		for i in range(mapconfig.num_mnts_per_continent):
-			num_anchors = random.randrange(2,6)
-			min_spacing = int(500/num_anchors)
-			max_spacing = int(2000/num_anchors)
-			#TODO Add this number to config/template
-			anchors = list()
-			for n in range(num_anchors):
-				if n == 0:
-					anchors.append(random.choice(subtile_list))
-					continue
-				else:
-					possibles = list()
-					for y in range(-max_spacing, max_spacing):
-						for x in range(-max_spacing, max_spacing):
-							print(x,y)
-							if geometry.distance_between_two_points(anchors[n-1], geometry.add_coordinates(anchors[n-1], (x,y))) > min_spacing:
-								possibles.append(geometry.add_coordinates(anchors[n-1], (x,y)))
-					new_anchor = random.choice(possibles)
+		subtile_list = list(continent.subtiles)
+		for n in range(0, mapconfig.num_mnts_per_continent):
+			num_anchors = random.randrange(3,8)
+			min_spacing = 10
+			max_spacing = 25
+			new_anchors = list()
+			new_anchors.append(random.choice(subtile_list))
+			for i in range(1, num_anchors):
+				outer = geometry.get_points_in_circle(new_anchors[n-1], max_spacing)
+				outer.update(geometry.get_points_inside_shape(outer, new_anchors[n-1]))
+				inner = geometry.get_points_in_circle(new_anchors[n-1], min_spacing)
+				inner.update(geometry.get_points_inside_shape(inner, new_anchors[n-1]))
+				possibles = outer.difference(inner)
+				possibles = possibles.intersection(continent.subtiles)
+				possibles = list(possibles)
+				new_anchors.append(random.choice(possibles))
 
-					anchors.append(new_anchor)
-			new_mountain_range = MountainRange(anchors)
+			print(new_anchors)
+			new_mountain_range = MountainRange(new_anchors)
 			mountain_ranges.append(new_mountain_range)
 
 	for mountain_range in mountain_ranges:
-		raise_mountain_range(mountain_range)
+		new_elevations = raise_mountain_range(mountain_range)
+		output.update(new_elevations)
 
+	# output = elevation_fuzz(mapconfig.roughness, output)
 
 	for subtile in output:
 		if output[subtile] < 0:
@@ -270,7 +265,7 @@ def generate_new_subtile_elevation_dict(mapconfig) -> dict:
 
 def raise_continent_to_elevation(continent, elevation) -> dict:
 	output = dict()
-	for subtile in continent.all_subtiles:
+	for subtile in continent.subtiles:
 		output[subtile] = elevation
 	for subtile in continent.boundary:
 		output[subtile] = 50
@@ -292,16 +287,37 @@ def raise_mountain_range(mountain_range) -> dict:
 		output[point] = 255
 	return output
 
-def create_continent(origin, sizex, sizey):
-	new_continent = continent(origin)
-	new_continent.origin = origin
-	current = origin
-	continent_outline = geometry.get_ellipse_points(origin, sizex, sizey)
-	for point in continent_outline:
-		new_continent.add_subtile(point)
-		new_continent.boundary.add(point)
-	new_continent.fill_continent()
-	return new_continent
+def build_continent(n_subcontinents, width, height):
+	start = geometry.get_ellipse_points((random.randrange(0, width), random.randrange(0, height)), random.randrange(25,100), random.randrange(25,100))
+	subcontinent_a = Continent(start)
+	subcontinent_a.rotate(random.randrange(360))
+	subcontinents = list()
+	subcontinents.append(subcontinent_a)
+	for n in range(1, n_subcontinents):
+		possibles = subcontinents[n-1].boundary
+		possibles = list(possibles)
+		sub_outline = geometry.get_ellipse_points(random.choice(possibles), random.randrange(25,100), random.randrange(25,100))
+		next_continent = Continent(sub_outline)
+		next_continent.rotate(random.randrange(360))
+		subcontinents.append(next_continent)
+	output = subcontinents[0]
+	for i in range(0, len(subcontinents)-1):
+		output = subcontinents[i].combine_continents(subcontinents[i+1])
+
+	noise_config = wrappednoise.NoiseConfig(1, 0.1, 1)
+	noise = wrappednoise.WrappedNoise(noise_config)
+	output.subtiles = {point for point in output.subtiles if noise.noise_at_point(point[0], point[1]) > -0.7}
+
+	return output
+
+def elevation_fuzz(roughness, el_dict) -> dict:
+	noise_config = wrappednoise.NoiseConfig(3, 0.03, 0.8, 0.5, roughness)
+	noise = wrappednoise.WrappedNoise(noise_config)
+	noise_dict = {key: int(noise.noise_at_point(key[0], key[1])) for key, value in el_dict.items()}
+	output = {key: int((el_dict[key] + noise_dict[key])/2) for key in el_dict}
+	return output
+
+
 
 
 def main():

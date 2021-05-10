@@ -1,5 +1,6 @@
 import math
 import queue
+import numpy as np
 
 def get_points_in_circle(center, radius):
     output = set()
@@ -173,6 +174,40 @@ def get_points_inside_shape(boundary, center) -> set:
             q.put(add_coordinates(current, (0, -1)))
 
     return output
+
+def rotate_point(point, angle, center_point=(0, 0)):
+    """Rotates a point around center_point(origin by default)
+    Angle is in degrees.
+    Rotation is counter-clockwise
+    """
+    angle_rad = math.radians(angle % 360)
+    # Shift the point so that center_point becomes the origin
+    new_point = (point[0] - center_point[0], point[1] - center_point[1])
+    new_point = (new_point[0] * math.cos(angle_rad) - new_point[1] * math.sin(angle_rad),
+                 new_point[0] * math.sin(angle_rad) + new_point[1] * math.cos(angle_rad))
+    # Reverse the shifting we have done
+    new_point = (new_point[0] + center_point[0], new_point[1] + center_point[1])
+    new_point = (round(new_point[0]), round(new_point[1]))
+    return new_point
+
+def find_center_of_points(points) -> tuple:
+    sumx = 0
+    sumy = 0
+    for point in points:
+        sumx += point[0]
+        sumy += point[1]
+    return (round(sumx/len(points)), round(sumy/len(points)))
+
+def rotate_shape(shape, angle) -> set:
+    """This function rotates a shape around its center using the rotate_point function. Which I stole."""
+    center = find_center_of_points(shape)
+    output = set()
+    for point in shape:
+        output.add(rotate_point(point, angle, center))
+    return output
+
+
+
 
 def main():
     circle = get_points_in_circle((0,0), 20)

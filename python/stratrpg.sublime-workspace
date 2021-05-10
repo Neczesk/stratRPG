@@ -4,6 +4,30 @@
 		"selected_items":
 		[
 			[
+				"rot",
+				"rotate"
+			],
+			[
+				"subco",
+				"subcontinent_a"
+			],
+			[
+				"get_points",
+				"get_points_inside_shape"
+			],
+			[
+				"__",
+				"__init__"
+			],
+			[
+				"get_po",
+				"get_points_inside_shape"
+			],
+			[
+				"poin",
+				"get_points_in_circle"
+			],
+			[
 				"anchors",
 				"anchors"
 			],
@@ -161,10 +185,13 @@
 			}
 		},
 		{
+			"contents": "#Standard library\nimport math\nimport statistics\nimport random\nimport queue\n\n#local imports\nimport wrappednoise\nimport helper\nimport db\nimport texgen\nimport geometry\n\ndef generate_elevation_list(mapconfig, subtileratio) -> list:\n\tnoise_config = wrappednoise.NoiseConfig(8, 0.01, 0.5, 0.5, 1)\n\tnoise = wrappednoise.WrappedNoise(noise_config)\n\t# noise.conf.freq *= (1/subtileratio) #This should convert this to a subtile elevation list, which can then be averaged if needed for a tile elevation list\n\toutput = list()\n\tfor y in range(0,mapconfig.height*subtileratio):\n\t\tfor x in range(0,mapconfig.width*subtileratio):\n\t\t\tpercent = noise.noise_at_point(x, y)\n\t\t\tif percent > 1 or percent < -1:\n\t\t\t\tprint(\"noise outside bounds\")\n\t\t\tpercent = helper.linearConversion(percent, -1, 1, 0, 100)\n\t\t\toutput.append(percent)\n\n\treturn output\n\ndef generate_tile_elevation_list(subtile_elevations, subtileratio) -> list:\n\toutput = list()\n\ti = 0\n\twhile i < len(subtile_elevations):\n\t\tk = i + int(math.pow(subtileratio, 2))\n\t\tnext_tile = subtile_elevations[i:k]\n\t\tmean = statistics.mean(next_tile)\n\t\toutput.append(mean)\n\t\ti += subtileratio\n\n\treturn output\n\n\nclass MapFeature:\n\tdef __init__(self):\n\t\tself.subtiles = set()\n\t\tself.boundary = set()\n\t\tself.center = (-1,-1)\n\n\tdef find_center(self) -> tuple:\n\t\tsumx = 0\n\t\tsumy = 0\n\t\tfor point in self.subtiles:\n\t\t\tsumx += point[0]\n\t\t\tsumy += point[1]\n\t\treturn (round(sumx/len(self.subtiles)), round(sumy/len(self.subtiles)))\n\n\tdef add_subtile(self, new_subtile):\n\t\tself.all_subtiles.add(new_subtile)\n\n\tdef find_boundary(self) -> set:\n\t\toutput = set()\n\t\tfor subtile in self.subtiles:\n\t\t\tboundary = False\n\t\t\tfor y in range(-1,2):\n\t\t\t\tfor x in range(-1,2):\n\t\t\t\t\tif x == 0 and y == 0:\n\t\t\t\t\t\tcontinue\n\t\t\t\t\tif geometry.add_coordinates(subtile, (x,y)) not in self.subtiles:\n\t\t\t\t\t\tboundary = True\n\t\t\tif boundary:\n\t\t\t\toutput.add(subtile)\n\n\t\treturn output\n\n\tdef fill_to_boundary(self) -> set:\n\t\treturn geometry.get_points_inside_shape(self.boundary, self.center)\n\n\tdef rotate(self, angle):\n\t\tself.boundary = set()\n\t\tself.subtiles = geometry.rotate_shape(self.subtiles, angle)\n\t\toverlooked = set()\n\t\tfor point in self.subtiles:\n\t\t\tfor mod in [(0,1),(1,0),(1,1),(-1,-1),(-1,0),(0,-1),(-1,1),(1,-1)]:\n\t\t\t\tcurrent = geometry.add_coordinates(point, mod)\n\t\t\t\tif current not in self.subtiles:\n\t\t\t\t\tnum_neighbors = 0\n\t\t\t\t\tfor mod2 in [(0,1),(1,0),(1,1),(-1,-1),(-1,0),(0,-1),(-1,1),(1,-1)]:\n\t\t\t\t\t\tif geometry.add_coordinates(current, mod2) in self.subtiles:\n\t\t\t\t\t\t\tnum_neighbors += 1\n\t\t\t\t\tif num_neighbors >= 4:\n\t\t\t\t\t\toverlooked.add(current)\n\t\tself.subtiles.update(overlooked)\n\n\t\tself.boundary = self.find_boundary()\n\n\n\n\n\nclass Continent(MapFeature):\n\tdef __init__(self, boundary):\n\t\tsuper().__init__()\n\t\tself.boundary = boundary\n\t\tself.subtiles.update(boundary)\n\t\tself.center = self.find_center()\n\t\tself.subtiles.update(self.fill_to_boundary())\n\n\tdef combine_continents(self, continent2):\n\t\tnew_subtiles = self.subtiles.union(continent2.subtiles)\n\t\ttemp = MapFeature()\n\t\ttemp.subtiles = new_subtiles\n\t\ttemp.boundary = temp.find_boundary()\n\t\treturn Continent(temp.boundary)\n\n\n\n\n\n\n\nclass MountainRange(MapFeature):\n\tdef __init__(self, anchors):\n\t\tsuper().__init__()\n\t\tself.anchors = list(anchors)\n\t\tself.mainline = self.set_mainline(self.anchors)\n\t\tself.highlands = self.set_highlands(2)\n\t\tself.foothills = self.set_foothills(6)\n\t\tself.subtiles = self.set_subtiles()\n\t\tself.center = self.find_center()\n\t\tself.boundary = self.find_boundary()\n\t\t# self.quadrants = self.create_quadrants()\n\n\tdef set_highlands(self, generations) -> set:\n\t\toutput = set()\n\t\tq = queue.Queue()\n\t\tfor point in self.mainline:\n\t\t\tq.put(point)\n\t\tfor i in range(generations):\n\t\t\tnew_tiles = set()\n\t\t\twhile not q.empty():\n\t\t\t\ttile = q.get()\n\t\t\t\tfor mod in [(0,1),(1,0),(-1,0),(0,-1),(1,1),(-1,-1),(-1,1),(1,-1)]:\n\t\t\t\t\tcurrent = geometry.add_coordinates(tile, mod)\n\t\t\t\t\tif current not in self.mainline:\n\t\t\t\t\t\tnew_tiles.add(current)\n\t\t\toutput.update(new_tiles)\n\t\t\tfor point in new_tiles:\n\t\t\t\tq.put(point)\n\n\t\treturn output\n\n\tdef set_foothills(self, generations) -> set:\n\t\toutput = set()\n\t\tq = queue.Queue()\n\t\tfor point in self.highlands:\n\t\t\tq.put(point)\n\t\tfor i in range(generations):\n\t\t\tnew_tiles = set()\n\t\t\twhile not q.empty():\n\t\t\t\ttile = q.get()\n\t\t\t\tfor mod in [(0,1),(1,0),(-1,0),(0,-1)]:\n\t\t\t\t\tcurrent = geometry.add_coordinates(tile, mod)\n\t\t\t\t\tif current not in self.mainline and current not in self.highlands:\n\t\t\t\t\t\tnew_tiles.add(current)\n\t\t\toutput.update(new_tiles)\n\t\t\tfor point in new_tiles:\n\t\t\t\tq.put(point)\n\n\t\treturn output\n\n\tdef set_subtiles(self) -> set:\n\t\treturn self.mainline.union(self.highlands, self.foothills)\n\n\tdef set_mainline(self, anchors) -> set:\n\t\toutput = set()\n\t\tfor i in range(0, len(anchors)):\n\t\t\tif (i+1) >= len(anchors):\n\t\t\t\tbreak\n\t\t\telse:\n\t\t\t\tnew_line = geometry.get_line_points(anchors[i], anchors[i+1])\n\t\t\t\tfor point in new_line:\n\t\t\t\t\toutput.add(point)\n\t\treturn output\n\n\n\n\tdef is_same_mountain_range(self, mountain_range):\n\t\tif len(self.subtiles.difference(mountain_range.subtiles)) == 0:\n\t\t\treturn True\n\t\telse:\n\t\t\treturn False\n\n\tdef create_quadrants(self) -> dict:\n\t\t# print(\"generating quadrants\")\n\t\toutput = dict()\n\t\t# print(self.boundary)\n\t\tfor subtile in self.boundary:\n\t\t\tif subtile[0] >= self.center[0] and subtile[1] >= self.center[1]:\n\t\t\t\toutput[subtile] = 1\n\t\t\telif subtile[0] >= self.center[0] and subtile[1] <= self.center[1]:\n\t\t\t\toutput[subtile] = 2\n\t\t\telif subtile[0] <= self.center[0] and subtile[1] <= self.center[1]:\n\t\t\t\toutput[subtile] = 3\n\t\t\telse:\n\t\t\t\toutput[subtile] = 4\n\t\t# print(output)\n\t\treturn output\n\n\tdef set_anchors(self, anchor1, anchor2):\n\t\tself.anchors.add(anchor1)\n\t\tself.anchors.add(anchor2)\n\n\n\n\ndef generate_new_subtile_elevation_dict(mapconfig) -> dict:\n\tlength = mapconfig.width * mapconfig.height * int((math.pow(mapconfig.subtiles, 2)))\n\toutput = dict()\n\tfor y in range(mapconfig.height*mapconfig.subtiles):\n\t\tfor x in range(mapconfig.width * mapconfig.subtiles):\n\t\t\toutput[(x,y)] = 0\n\tcontinents = list()\n\tfor i in range(mapconfig.num_continents):\n\t\t# new_ellipse = geometry.get_ellipse_points((random.randrange(0, mapconfig.width*mapconfig.subtiles), random.randrange(0, mapconfig.height*mapconfig.subtiles)), random.randrange(25,75), random.randrange(25,75))\n\t\t# # new_ellipse = geometry.rotate_shape(new_ellipse, random.randrange(360))\n\t\t# new_continent = Continent(new_ellipse)\n\t\t# new_continent.rotate(random.randrange(360))\n\t\tcontinents.append(build_continent(3, mapconfig.width*mapconfig.subtiles, mapconfig.height*mapconfig.subtiles))\n\t\tnew_elevations = raise_continent_to_elevation(continents[i], 70)\n\t\toutput.update(new_elevations)\n\tmountain_ranges = list()\n\tfor continent in continents:\n\t\tsubtile_list = list(continent.subtiles)\n\t\tfor n in range(0, mapconfig.num_mnts_per_continent):\n\t\t\tnum_anchors = random.randrange(3,8)\n\t\t\tmin_spacing = 10\n\t\t\tmax_spacing = 25\n\t\t\tnew_anchors = list()\n\t\t\tnew_anchors.append(random.choice(subtile_list))\n\t\t\tfor i in range(1, num_anchors):\n\t\t\t\touter = geometry.get_points_in_circle(new_anchors[n-1], max_spacing)\n\t\t\t\touter.update(geometry.get_points_inside_shape(outer, new_anchors[n-1]))\n\t\t\t\tinner = geometry.get_points_in_circle(new_anchors[n-1], min_spacing)\n\t\t\t\tinner.update(geometry.get_points_inside_shape(inner, new_anchors[n-1]))\n\t\t\t\tpossibles = outer.difference(inner)\n\t\t\t\tpossibles = possibles.intersection(continent.subtiles)\n\t\t\t\tpossibles = list(possibles)\n\t\t\t\tnew_anchors.append(random.choice(possibles))\n\n\t\t\tprint(new_anchors)\n\t\t\tnew_mountain_range = MountainRange(new_anchors)\n\t\t\tmountain_ranges.append(new_mountain_range)\n\n\tfor mountain_range in mountain_ranges:\n\t\tnew_elevations = raise_mountain_range(mountain_range)\n\t\toutput.update(new_elevations)\n\n\n\tfor subtile in output:\n\t\tif output[subtile] < 0:\n\t\t\toutput[subtile] = 0\n\t\telif output[subtile] > 255:\n\t\t\toutput[subtile] = 255\n\treturn output\n\ndef raise_continent_to_elevation(continent, elevation) -> dict:\n\toutput = dict()\n\tfor subtile in continent.subtiles:\n\t\toutput[subtile] = elevation\n\tfor subtile in continent.boundary:\n\t\toutput[subtile] = 50\n\t# print(len(output))\n\t# print(output)\n\treturn output\n\ndef raise_mountain_range(mountain_range) -> dict:\n\toutput = dict()\n\tfor point in mountain_range.foothills:\n\t\toutput[point] = 100\n\tfor point in mountain_range.highlands:\n\t\toutput[point] = 128\n\tfor point in mountain_range.mainline:\n\t\toutput[point] = 180\n\tfor point in mountain_range.boundary:\n\t\toutput[point] = 220\n\tfor point in mountain_range.anchors:\n\t\toutput[point] = 255\n\treturn output\n\ndef build_continent(n_subcontinents, width, height):\n\tstart = geometry.get_ellipse_points((random.randrange(0, width), random.randrange(0, height)), random.randrange(25,100), random.randrange(25,100))\n\tsubcontinent_a = Continent(start)\n\tsubcontinent_a.rotate(random.randrange(360))\n\tsubcontinents = list()\n\tsubcontinents.append(subcontinent_a)\n\tfor n in range(1, n_subcontinents):\n\t\tpossibles = subcontinents[n-1].boundary\n\t\tpossibles = list(possibles)\n\t\tsub_outline = geometry.get_ellipse_points(random.choice(possibles), random.randrange(25,100), random.randrange(25,100))\n\t\tnext_continent = Continent(sub_outline)\n\t\tnext_continent.rotate(random.randrange(360))\n\t\tsubcontinents.append(next_continent)\n\toutput = subcontinents[0]\n\tfor i in range(0, len(subcontinents)-1):\n\t\toutput = subcontinents[i].combine_continents(subcontinents[i+1])\n\n\treturn output\n\ndef elevation_fuzz(roughness, el_dict) -> dict:\n\tnoise_config = wrappednoise.NoiseConfig(3, 0.01, 1, 0.5, roughness)\n\tnoise = wrappednoise.WrappedNoise(noise_config)\n\toutput = \n\n\n\n\n\ndef main():\n\tsettings = db.ConfigDB()\n\tmapconfig = settings.get_script_config(\"test\")\n\tsettings.close()\n\tel_dict = generate_new_subtile_elevation_dict(mapconfig)\n\t# print(len(el_dict))\n\ttexgen.draw_elevation_map(el_dict, \"elev_map.png\", mapconfig.width*mapconfig.subtiles, mapconfig.height*mapconfig.subtiles, 20)\n\t# print(el_dict)\n\n\n\nif __name__ == '__main__':\n\tmain()\n",
 			"file": "elevgen.py",
+			"file_size": 9679,
+			"file_write_time": 132651504419602175,
 			"settings":
 			{
-				"buffer_size": 9315,
+				"buffer_size": 9858,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			}
@@ -198,7 +225,16 @@
 			"file": "helper.py",
 			"settings":
 			{
-				"buffer_size": 3480,
+				"buffer_size": 561,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "geometry.py",
+			"settings":
+			{
+				"buffer_size": 6559,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			}
@@ -303,7 +339,7 @@
 	],
 	"find":
 	{
-		"height": 29.0
+		"height": 25.0
 	},
 	"find_in_files":
 	{
@@ -317,6 +353,9 @@
 		"case_sensitive": false,
 		"find_history":
 		[
+			"helper",
+			"self.set",
+			", colour",
 			"el_list",
 			"subtile_coord_max + 1",
 			"noise",
@@ -337,6 +376,9 @@
 		"regex": false,
 		"replace_history":
 		[
+			"geometry",
+			"output.add",
+			"",
 			"el_dict",
 			"mapconfig.subtiles",
 			"tile_dict",
@@ -386,7 +428,7 @@
 						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 4,
+					"stack_index": 5,
 					"type": "text"
 				},
 				{
@@ -395,15 +437,15 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 9315,
+						"buffer_size": 9858,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								7090,
-								7090
+								9482,
+								9482
 							]
 						],
 						"settings":
@@ -412,7 +454,7 @@
 							"translate_tabs_to_spaces": false
 						},
 						"translation.x": 0.0,
-						"translation.y": 3208.0,
+						"translation.y": 4336.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
@@ -443,7 +485,7 @@
 						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 5,
+					"stack_index": 1,
 					"type": "text"
 				},
 				{
@@ -459,8 +501,8 @@
 						"selection":
 						[
 							[
-								954,
-								954
+								929,
+								938
 							]
 						],
 						"settings":
@@ -469,10 +511,10 @@
 							"translate_tabs_to_spaces": false
 						},
 						"translation.x": 0.0,
-						"translation.y": 430.0,
+						"translation.y": 96.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 6,
+					"stack_index": 2,
 					"type": "text"
 				},
 				{
@@ -510,15 +552,15 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 3480,
+						"buffer_size": 561,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								3200,
-								3200
+								352,
+								352
 							]
 						],
 						"settings":
@@ -526,14 +568,44 @@
 							"syntax": "Packages/Python/Python.sublime-syntax"
 						},
 						"translation.x": 0.0,
-						"translation.y": 1395.0,
+						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 1,
+					"stack_index": 6,
 					"type": "text"
 				},
 				{
 					"buffer": 6,
+					"file": "geometry.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 6559,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								4914,
+								4914
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Python/Python.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 2256.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"type": "text"
+				},
+				{
+					"buffer": 7,
 					"file": "db.py",
 					"semi_transient": false,
 					"settings":
@@ -557,11 +629,11 @@
 						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 2,
+					"stack_index": 3,
 					"type": "text"
 				},
 				{
-					"buffer": 7,
+					"buffer": 8,
 					"file": "texgen.py",
 					"semi_transient": false,
 					"settings":
@@ -582,10 +654,10 @@
 							"syntax": "Packages/Python/Python.sublime-syntax"
 						},
 						"translation.x": 0.0,
-						"translation.y": 848.0,
+						"translation.y": 779.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 3,
+					"stack_index": 8,
 					"type": "text"
 				}
 			]
@@ -593,7 +665,7 @@
 	],
 	"incremental_find":
 	{
-		"height": 29.0
+		"height": 25.0
 	},
 	"input":
 	{
@@ -634,7 +706,7 @@
 	"project": "stratrpg.sublime-project",
 	"replace":
 	{
-		"height": 54.0
+		"height": 46.0
 	},
 	"save_all_on_build": true,
 	"select_file":
