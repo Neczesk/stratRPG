@@ -75,6 +75,11 @@ class WrappedNoise:
 				results.append(percent)
 		return results
 
+
+
+	def reseed(self, new_seed):
+		self.noise = OpenSimplex(new_seed)
+
 def noise_to_percent(input: float):
 	return (((input + 1) * 100)/ 2)
 

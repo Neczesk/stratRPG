@@ -1,6 +1,7 @@
 import math
 import queue
-import numpy as np
+
+
 
 def get_points_in_circle(center, radius):
     output = set()
@@ -11,6 +12,8 @@ def get_points_in_circle(center, radius):
     y = radius
     x0 = center[0]
     y0 = center[1]
+    print(x0)
+    print(y0)
     output.add((x0, y0 + radius))
     output.add((x0, y0 - radius))
     output.add((x0 + radius, y0))

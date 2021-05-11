@@ -111,12 +111,6 @@ class Continent(MapFeature):
 		temp.boundary = temp.find_boundary()
 		return Continent(temp.boundary)
 
-
-
-
-
-
-
 class MountainRange(MapFeature):
 	def __init__(self, anchors):
 		super().__init__()
@@ -267,8 +261,6 @@ def raise_continent_to_elevation(continent, elevation) -> dict:
 	output = dict()
 	for subtile in continent.subtiles:
 		output[subtile] = elevation
-	for subtile in continent.boundary:
-		output[subtile] = 50
 	# print(len(output))
 	# print(output)
 	return output
@@ -304,10 +296,18 @@ def build_continent(n_subcontinents, width, height):
 	for i in range(0, len(subcontinents)-1):
 		output = subcontinents[i].combine_continents(subcontinents[i+1])
 
-	noise_config = wrappednoise.NoiseConfig(1, 0.1, 1)
-	noise = wrappednoise.WrappedNoise(noise_config)
-	output.subtiles = {point for point in output.subtiles if noise.noise_at_point(point[0], point[1]) > -0.7}
+	noise_config = wrappednoise.NoiseConfig(1, 0.1, 1, 0.5, 1)
+	noisey = wrappednoise.WrappedNoise(noise_config)
+	noisex = wrappednoise.WrappedNoise(noise_config)
+	noisex.reseed(random.randrange(-10000, 10000))
+	perturbed = set()
+	for subtile in output.subtiles:
+		new_x = int(subtile[0] + noisex.noise_at_point(subtile[0], subtile[1]))
+		new_y = int(subtile[1] + noisey.noise_at_point(subtile[0], subtile[1]))
+		perturbed.add((new_x, new_y))
+	print( perturbed)
 
+	output.subtiles = perturbed
 	return output
 
 def elevation_fuzz(roughness, el_dict) -> dict:
@@ -316,6 +316,7 @@ def elevation_fuzz(roughness, el_dict) -> dict:
 	noise_dict = {key: int(noise.noise_at_point(key[0], key[1])) for key, value in el_dict.items()}
 	output = {key: int((el_dict[key] + noise_dict[key])/2) for key in el_dict}
 	return output
+
 
 
 
